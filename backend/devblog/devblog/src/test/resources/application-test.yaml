@@ -1,0 +1,36 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+    show-sql: false
+  security:
+    user:
+      # Suppress auto-generated security password noise in test output
+      password: test
+
+jwt:
+  secret: test-secret-key-for-testing-only-must-be-256-bits-long-padding!!!
+  access-expiration: 900000
+  refresh-expiration: 604800000
+
+app:
+  seed:
+    admin:
+      username: admin
+      email: admin@devblog.local
+      password: Admin@1234
+    user:
+      username: user
+      email: user@devblog.local
+      password: User@1234
+  security:
+    bcrypt-strength: 4
+
+cors:
+  allowed-origins: http://localhost:5173

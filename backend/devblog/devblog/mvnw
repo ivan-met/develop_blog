@@ -32,6 +32,9 @@
 set -euf
 [ "${MVNW_VERBOSE-}" != debug ] || set -x
 
+# Java 21 home (Windows path, will be converted for MinGW below)
+JAVA21_WIN="${JAVA21_WIN:-C:\Users\i.metodiev\.jdks\corretto-21.0.11}"
+
 # OS specific support.
 native_path() { printf %s\\n "$1"; }
 case "$(uname)" in
@@ -147,6 +150,22 @@ MAVEN_HOME="${MAVEN_USER_HOME}/wrapper/dists/${distributionUrlNameMain-}/$(hash_
 
 exec_maven() {
   unset MVNW_VERBOSE MVNW_USERNAME MVNW_PASSWORD MVNW_REPOURL || :
+  # Use Java 21 directly to run Maven, bypassing JAVA_HOME issues
+  JAVA21_UNIX="$(cygpath "$JAVA21_WIN" 2>/dev/null || printf '%s' "$JAVA21_WIN" | sed 's|\\|/|g; s|^\([A-Za-z]\):|/\L\1|')"
+  MAVEN_BOOT="$MAVEN_HOME/boot"
+  set +f
+  BOOT_JAR="$(ls "$MAVEN_BOOT"/plexus-classworlds-*.jar 2>/dev/null | head -1)"
+  set -f
+  if [ -n "$BOOT_JAR" ]; then
+    BOOT_JAR_WIN="$(native_path "$BOOT_JAR")"
+    exec "$JAVA21_UNIX/bin/java" \
+      -classpath "$BOOT_JAR_WIN" \
+      "-Dclassworlds.conf=$(native_path "$MAVEN_HOME/bin/m2.conf")" \
+      "-Dmaven.home=$(native_path "$MAVEN_HOME")" \
+      "-Dlibrary.jansi.path=$(native_path "$MAVEN_HOME/lib/jansi-native")" \
+      "-Dmaven.multiModuleProjectDirectory=$(native_path "$scriptDir")" \
+      org.codehaus.plexus.classworlds.launcher.Launcher "$@"
+  fi
   exec "$MAVEN_HOME/bin/$MVN_CMD" "$@" || die "cannot exec $MAVEN_HOME/bin/$MVN_CMD"
 }
 
