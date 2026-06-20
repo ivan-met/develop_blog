@@ -1,5 +1,8 @@
 package met.ivan.devblog;
 
+import met.ivan.devblog.entity.Category;
+import met.ivan.devblog.entity.Post;
+import met.ivan.devblog.entity.PostStatus;
 import met.ivan.devblog.entity.Role;
 import met.ivan.devblog.entity.RoleName;
 import met.ivan.devblog.entity.User;
@@ -43,6 +46,59 @@ public class TestDataFactory {
                 .active(true)
                 .roles(new HashSet<>(Set.of(adminRole, userRole)))
                 .createdAt(Instant.now())
+                .build();
+    }
+
+    public static Category category() {
+        return Category.builder()
+                .id(1L)
+                .name("Java")
+                .slug("java")
+                .description("Java programming")
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+    }
+
+    public static Category category(Long id, String name, String slug) {
+        return Category.builder()
+                .id(id)
+                .name(name)
+                .slug(slug)
+                .description(name + " description")
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+    }
+
+    public static Post draftPost(User author, Category category) {
+        return Post.builder()
+                .id(10L)
+                .title("Test Post")
+                .slug("test-post")
+                .contentMarkdown("# Hello")
+                .excerpt("A test post")
+                .status(PostStatus.DRAFT)
+                .author(author)
+                .category(category)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+    }
+
+    public static Post publishedPost(User author, Category category) {
+        return Post.builder()
+                .id(11L)
+                .title("Published Post")
+                .slug("published-post")
+                .contentMarkdown("# Published")
+                .excerpt("A published post")
+                .status(PostStatus.PUBLISHED)
+                .author(author)
+                .category(category)
+                .publishedAt(Instant.now())
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
                 .build();
     }
 }

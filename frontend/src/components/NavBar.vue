@@ -47,16 +47,57 @@ function closeMobileMenu() {
 
         <!-- Desktop nav -->
         <div class="hidden sm:flex items-center gap-1">
+          <!-- Browse: always visible -->
+          <RouterLink
+            to="/"
+            class="nav-link px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
+            style="color: #8B949E;"
+            active-class="nav-link-active"
+          >
+            Browse
+          </RouterLink>
+
           <template v-if="auth.isAuthenticated">
-            <RouterLink
-              v-if="auth.isAdmin"
-              to="/admin/users"
-              class="nav-link px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
-              style="color: #8B949E;"
-              active-class="nav-link-active"
-            >
-              User Admin
-            </RouterLink>
+            <!-- Admin-only links -->
+            <template v-if="auth.isAdmin">
+              <RouterLink
+                to="/admin/categories"
+                class="nav-link px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
+                style="color: #8B949E;"
+                active-class="nav-link-active"
+              >
+                Categories
+              </RouterLink>
+              <RouterLink
+                to="/admin/users"
+                class="nav-link px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
+                style="color: #8B949E;"
+                active-class="nav-link-active"
+              >
+                User Admin
+              </RouterLink>
+            </template>
+
+            <!-- USER-only authoring links (hidden for admins) -->
+            <template v-else>
+              <RouterLink
+                to="/posts/new"
+                class="nav-link px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
+                style="color: #8B949E;"
+                active-class="nav-link-active"
+              >
+                New post
+              </RouterLink>
+              <RouterLink
+                to="/me/posts"
+                class="nav-link px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
+                style="color: #8B949E;"
+                active-class="nav-link-active"
+              >
+                My posts
+              </RouterLink>
+            </template>
+
             <RouterLink
               to="/profile"
               class="nav-link px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
@@ -65,6 +106,7 @@ function closeMobileMenu() {
             >
               Profile
             </RouterLink>
+
             <div class="ml-2 flex items-center gap-3">
               <span class="text-sm" style="color: #8B949E;">
                 {{ auth.currentUser?.username ?? '...' }}
@@ -81,6 +123,7 @@ function closeMobileMenu() {
               </button>
             </div>
           </template>
+
           <template v-else>
             <RouterLink
               to="/login"
@@ -119,20 +162,66 @@ function closeMobileMenu() {
 
       <!-- Mobile menu -->
       <div v-if="mobileMenuOpen" class="sm:hidden pb-3 pt-1 border-t" style="border-color: #30363D;">
+        <!-- Browse: always visible -->
+        <RouterLink
+          to="/"
+          class="block px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
+          style="color: #8B949E;"
+          active-class="nav-link-active"
+          @click="closeMobileMenu"
+        >
+          Browse
+        </RouterLink>
+
         <template v-if="auth.isAuthenticated">
           <div class="px-1 py-2 text-sm" style="color: #8B949E;">
             Signed in as <span style="color: #E6EDF3;">{{ auth.currentUser?.username ?? '...' }}</span>
           </div>
-          <RouterLink
-            v-if="auth.isAdmin"
-            to="/admin/users"
-            class="block px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
-            style="color: #8B949E;"
-            active-class="nav-link-active"
-            @click="closeMobileMenu"
-          >
-            User Admin
-          </RouterLink>
+
+          <!-- Admin-only links -->
+          <template v-if="auth.isAdmin">
+            <RouterLink
+              to="/admin/categories"
+              class="block px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
+              style="color: #8B949E;"
+              active-class="nav-link-active"
+              @click="closeMobileMenu"
+            >
+              Categories
+            </RouterLink>
+            <RouterLink
+              to="/admin/users"
+              class="block px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
+              style="color: #8B949E;"
+              active-class="nav-link-active"
+              @click="closeMobileMenu"
+            >
+              User Admin
+            </RouterLink>
+          </template>
+
+          <!-- USER-only authoring links -->
+          <template v-else>
+            <RouterLink
+              to="/posts/new"
+              class="block px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
+              style="color: #8B949E;"
+              active-class="nav-link-active"
+              @click="closeMobileMenu"
+            >
+              New post
+            </RouterLink>
+            <RouterLink
+              to="/me/posts"
+              class="block px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
+              style="color: #8B949E;"
+              active-class="nav-link-active"
+              @click="closeMobileMenu"
+            >
+              My posts
+            </RouterLink>
+          </template>
+
           <RouterLink
             to="/profile"
             class="block px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
@@ -151,6 +240,7 @@ function closeMobileMenu() {
             Sign out
           </button>
         </template>
+
         <template v-else>
           <RouterLink
             to="/login"

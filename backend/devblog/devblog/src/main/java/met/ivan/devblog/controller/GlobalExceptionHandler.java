@@ -2,7 +2,9 @@ package met.ivan.devblog.controller;
 
 import met.ivan.devblog.dto.ErrorResponse;
 import met.ivan.devblog.exception.BadCredentialsException;
+import met.ivan.devblog.exception.ConflictException;
 import met.ivan.devblog.exception.DuplicateResourceException;
+import met.ivan.devblog.exception.ForbiddenOperationException;
 import met.ivan.devblog.exception.InvalidTokenException;
 import met.ivan.devblog.exception.ResourceNotFoundException;
 import org.springframework.http.HttpStatus;
@@ -43,6 +45,24 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleDuplicate(DuplicateResourceException ex) {
         return ErrorResponse.of(HttpStatus.CONFLICT.value(), "Conflict", ex.getMessage());
+    }
+
+    @ExceptionHandler(ForbiddenOperationException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ErrorResponse handleForbidden(ForbiddenOperationException ex) {
+        return ErrorResponse.of(HttpStatus.FORBIDDEN.value(), "Forbidden", ex.getMessage());
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleConflict(ConflictException ex) {
+        return ErrorResponse.of(HttpStatus.CONFLICT.value(), "Conflict", ex.getMessage());
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleIllegalArgument(IllegalArgumentException ex) {
+        return ErrorResponse.of(HttpStatus.BAD_REQUEST.value(), "Bad Request", ex.getMessage());
     }
 
     @ExceptionHandler(BadCredentialsException.class)
