@@ -14,6 +14,9 @@ desktop.ini
 
 # Logs
 *.log
+# ...but keep prompt logs under version control
+!docs/prompt_logs/
+!docs/prompt_logs/*.log
 
 # Environment / secrets
 .env
