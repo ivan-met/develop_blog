@@ -1,3 +1,70 @@
+// ─── Post & Category domain ───────────────────────────────────────────────────
+
+export type PostStatus = 'DRAFT' | 'PUBLISHED'
+
+export interface CategoryResponse {
+  id: number
+  name: string
+  slug: string
+  description: string | null
+}
+
+export interface AuthorSummary {
+  id: number
+  username: string
+  displayName: string | null
+}
+
+export interface PostSummaryResponse {
+  id: number
+  slug: string
+  title: string
+  excerpt: string | null
+  status: PostStatus
+  category: CategoryResponse | null
+  author: AuthorSummary
+  publishedAt: string | null
+  createdAt: string
+}
+
+export interface PostResponse extends PostSummaryResponse {
+  contentMarkdown: string
+  updatedAt: string
+}
+
+// ─── Post request bodies ──────────────────────────────────────────────────────
+
+export interface CreatePostRequest {
+  title: string
+  contentMarkdown: string
+  excerpt?: string
+  categoryId?: number
+  status?: PostStatus
+}
+
+export interface UpdatePostRequest {
+  title: string
+  contentMarkdown: string
+  excerpt?: string
+  categoryId?: number
+}
+
+export interface UpdatePostStatusRequest {
+  status: PostStatus
+}
+
+// ─── Category request bodies ──────────────────────────────────────────────────
+
+export interface CreateCategoryRequest {
+  name: string
+  description?: string
+}
+
+export interface UpdateCategoryRequest {
+  name: string
+  description?: string
+}
+
 // ─── API DTO types (mirrors the backend contract) ───────────────────────────
 
 export interface UserResponse {

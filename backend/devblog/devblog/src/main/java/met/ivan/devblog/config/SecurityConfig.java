@@ -63,6 +63,13 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/users/**").authenticated()
+                        // Post authoring — must come before the public GET wildcard
+                        .requestMatchers("/api/posts/mine", "/api/posts/mine/**").authenticated()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/posts").authenticated()
+                        .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/posts/**").authenticated()
+                        .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/posts/**").authenticated()
+                        // Public reads
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/posts/**", "/api/categories/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex

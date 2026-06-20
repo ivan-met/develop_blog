@@ -4,10 +4,15 @@ import { useAuthStore } from '@/stores/auth'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    // ─── Public ────────────────────────────────────────────────────────────
     {
       path: '/',
-      redirect: '/login',
+      name: 'home',
+      component: () => import('@/views/PostsListView.vue'),
+      meta: { public: true },
     },
+
+    // ─── Auth pages ─────────────────────────────────────────────────────────
     {
       path: '/login',
       name: 'login',
@@ -20,6 +25,8 @@ const router = createRouter({
       component: () => import('@/views/RegisterView.vue'),
       meta: { public: true, redirectIfAuth: true },
     },
+
+    // ─── Authenticated (post routes before :slug to prevent conflict) ────────
     {
       path: '/profile',
       name: 'profile',
@@ -27,14 +34,50 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/posts/new',
+      name: 'post-new',
+      component: () => import('@/views/PostEditorView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/posts/:id/edit',
+      name: 'post-edit',
+      component: () => import('@/views/PostEditorView.vue'),
+      meta: { requiresAuth: true },
+    },
+
+    // ─── Public post detail (after static /posts/* to avoid conflicts) ────────
+    {
+      path: '/posts/:slug',
+      name: 'post-detail',
+      component: () => import('@/views/PostDetailView.vue'),
+      meta: { public: true },
+    },
+    {
+      path: '/me/posts',
+      name: 'my-posts',
+      component: () => import('@/views/MyPostsView.vue'),
+      meta: { requiresAuth: true },
+    },
+
+    // ─── Admin ─────────────────────────────────────────────────────────────
+    {
       path: '/admin/users',
       name: 'admin-users',
       component: () => import('@/views/admin/UsersView.vue'),
       meta: { requiresAuth: true, requiresAdmin: true },
     },
     {
+      path: '/admin/categories',
+      name: 'admin-categories',
+      component: () => import('@/views/admin/CategoriesView.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
+
+    // ─── Fallback ───────────────────────────────────────────────────────────
+    {
       path: '/:pathMatch(.*)*',
-      redirect: '/login',
+      redirect: '/',
     },
   ],
 })
@@ -45,7 +88,7 @@ router.beforeEach(async (to) => {
 
   // Redirect authenticated users away from public-only pages (login/register)
   if (to.meta.redirectIfAuth && auth.isAuthenticated) {
-    return { name: 'profile' }
+    return { name: 'home' }
   }
 
   // Protect authenticated routes
@@ -60,7 +103,7 @@ router.beforeEach(async (to) => {
       await auth.loadMe()
     }
     if (!auth.isAdmin) {
-      return { name: 'profile' }
+      return { name: 'home' }
     }
   }
 
