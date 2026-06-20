@@ -67,7 +67,7 @@ class PostControllerTest {
         CategoryResponse cat = new CategoryResponse(1L, "Java", "java", null);
         return new PostSummaryResponse(10L, "test-post", "Test Post", "Excerpt",
                 PostStatus.PUBLISHED, cat, author, Instant.now(), Instant.now(),
-                Set.of("java", "spring"), 42L);
+                Set.of("java", "spring"), 42L, 5L);
     }
 
     private PostResponse sampleResponse() {
@@ -75,7 +75,7 @@ class PostControllerTest {
         CategoryResponse cat = new CategoryResponse(1L, "Java", "java", null);
         return new PostResponse(10L, "test-post", "Test Post", "Excerpt",
                 PostStatus.PUBLISHED, cat, author, Instant.now(), Instant.now(),
-                "# Content", Instant.now(), Set.of("java", "spring"), 42L);
+                "# Content", Instant.now(), Set.of("java", "spring"), 42L, 5L, null, null);
     }
 
     // --- Public GET /api/posts ---
@@ -84,7 +84,7 @@ class PostControllerTest {
     @DisplayName("GET /api/posts - anonymous can list published posts (200)")
     void listPublished_anonymous_returns200() throws Exception {
         Page<PostSummaryResponse> page = new PageImpl<>(List.of(sampleSummary()), PageRequest.of(0, 20), 1);
-        when(postService.listPublished(isNull(), isNull(), isNull(), any())).thenReturn(page);
+        when(postService.listPublished(isNull(), isNull(), isNull(), any(), isNull())).thenReturn(page);
 
         mockMvc.perform(get("/api/posts"))
                 .andExpect(status().isOk())
@@ -95,44 +95,46 @@ class PostControllerTest {
     @DisplayName("GET /api/posts?sort=popular - passes sort param to service")
     void listPublished_sortPopular_passesToService() throws Exception {
         Page<PostSummaryResponse> page = new PageImpl<>(List.of(sampleSummary()), PageRequest.of(0, 20), 1);
-        when(postService.listPublished(isNull(), isNull(), eq("popular"), any())).thenReturn(page);
+        when(postService.listPublished(isNull(), isNull(), eq("popular"), any(), isNull())).thenReturn(page);
 
         mockMvc.perform(get("/api/posts").param("sort", "popular"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].slug").value("test-post"));
 
-        verify(postService).listPublished(isNull(), isNull(), eq("popular"), any());
+        verify(postService).listPublished(isNull(), isNull(), eq("popular"), any(), isNull());
     }
 
     @Test
-    @DisplayName("GET /api/posts - response JSON includes tags and viewCount")
-    void listPublished_responseIncludesTagsAndViewCount() throws Exception {
+    @DisplayName("GET /api/posts - response JSON includes tags, viewCount, and likeCount")
+    void listPublished_responseIncludesTagsViewCountAndLikeCount() throws Exception {
         Page<PostSummaryResponse> page = new PageImpl<>(List.of(sampleSummary()), PageRequest.of(0, 20), 1);
-        when(postService.listPublished(any(), any(), any(), any())).thenReturn(page);
+        when(postService.listPublished(any(), any(), any(), any(), any())).thenReturn(page);
 
         mockMvc.perform(get("/api/posts"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].viewCount").value(42))
+                .andExpect(jsonPath("$.content[0].likeCount").value(5))
                 .andExpect(jsonPath("$.content[0].tags").isArray());
     }
 
     @Test
     @DisplayName("GET /api/posts/{slug} - anonymous can get published post (200)")
     void getBySlug_anonymous_returns200() throws Exception {
-        when(postService.getPublishedBySlug("test-post")).thenReturn(sampleResponse());
+        when(postService.getPublishedBySlug(eq("test-post"), isNull())).thenReturn(sampleResponse());
 
         mockMvc.perform(get("/api/posts/test-post"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.slug").value("test-post"))
                 .andExpect(jsonPath("$.contentMarkdown").value("# Content"))
                 .andExpect(jsonPath("$.tags").isArray())
-                .andExpect(jsonPath("$.viewCount").value(42));
+                .andExpect(jsonPath("$.viewCount").value(42))
+                .andExpect(jsonPath("$.likeCount").value(5));
     }
 
     @Test
     @DisplayName("GET /api/posts/{slug} - draft returns 404 for anonymous")
     void getBySlug_draft_returns404() throws Exception {
-        when(postService.getPublishedBySlug("draft-post"))
+        when(postService.getPublishedBySlug(eq("draft-post"), isNull()))
                 .thenThrow(new ResourceNotFoundException("Not found"));
 
         mockMvc.perform(get("/api/posts/draft-post"))

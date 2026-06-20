@@ -19,7 +19,21 @@ public class PostMapper {
         this.categoryMapper = categoryMapper;
     }
 
+    /**
+     * Map to full PostResponse without engagement data (anonymous/unenriched context).
+     */
     public PostResponse toResponse(Post post) {
+        return toResponse(post, null, null, null);
+    }
+
+    /**
+     * Map to full PostResponse with engagement data (authenticated context).
+     *
+     * @param likeCount  total likes for this post, or null if unknown
+     * @param liked      whether the current user liked this post, or null if anonymous
+     * @param bookmarked whether the current user bookmarked this post, or null if anonymous
+     */
+    public PostResponse toResponse(Post post, Long likeCount, Boolean liked, Boolean bookmarked) {
         return new PostResponse(
                 post.getId(),
                 post.getSlug(),
@@ -33,11 +47,26 @@ public class PostMapper {
                 post.getContentMarkdown(),
                 post.getUpdatedAt(),
                 copyTags(post),
-                post.getViewCount()
+                post.getViewCount(),
+                likeCount,
+                liked,
+                bookmarked
         );
     }
 
+    /**
+     * Map to PostSummaryResponse without engagement data.
+     */
     public PostSummaryResponse toSummary(Post post) {
+        return toSummary(post, null);
+    }
+
+    /**
+     * Map to PostSummaryResponse with a pre-computed like count.
+     *
+     * @param likeCount total likes for this post, or null if unknown
+     */
+    public PostSummaryResponse toSummary(Post post, Long likeCount) {
         return new PostSummaryResponse(
                 post.getId(),
                 post.getSlug(),
@@ -49,7 +78,8 @@ public class PostMapper {
                 post.getPublishedAt(),
                 post.getCreatedAt(),
                 copyTags(post),
-                post.getViewCount()
+                post.getViewCount(),
+                likeCount
         );
     }
 

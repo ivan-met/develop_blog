@@ -25,4 +25,8 @@ public class PostResponse {
     private final Instant updatedAt;
     private final Set<String> tags;
     private final Long viewCount;
+    // Engagement fields
+    private final Long likeCount;
+    private final Boolean liked;
+    private final Boolean bookmarked;
 }

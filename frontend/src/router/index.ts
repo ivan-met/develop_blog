@@ -59,6 +59,20 @@ const router = createRouter({
       component: () => import('@/views/MyPostsView.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/me/bookmarks',
+      name: 'bookmarks',
+      component: () => import('@/views/BookmarksView.vue'),
+      meta: { requiresAuth: true },
+    },
+
+    // ─── Public author profiles ─────────────────────────────────────────────
+    {
+      path: '/authors/:username',
+      name: 'author-profile',
+      component: () => import('@/views/AuthorProfileView.vue'),
+      meta: { public: true },
+    },
 
     // ─── Admin ─────────────────────────────────────────────────────────────
     {

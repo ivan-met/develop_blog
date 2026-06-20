@@ -1,12 +1,17 @@
 package met.ivan.devblog.config;
 
 import met.ivan.devblog.entity.Category;
+import met.ivan.devblog.entity.Comment;
 import met.ivan.devblog.entity.Post;
+import met.ivan.devblog.entity.PostLike;
 import met.ivan.devblog.entity.PostStatus;
 import met.ivan.devblog.entity.Role;
 import met.ivan.devblog.entity.RoleName;
 import met.ivan.devblog.entity.User;
 import met.ivan.devblog.repository.CategoryRepository;
+import met.ivan.devblog.repository.CommentRepository;
+import met.ivan.devblog.repository.PostBookmarkRepository;
+import met.ivan.devblog.repository.PostLikeRepository;
 import met.ivan.devblog.repository.PostRepository;
 import met.ivan.devblog.repository.RoleRepository;
 import met.ivan.devblog.repository.UserRepository;
@@ -22,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Component
@@ -33,6 +39,9 @@ public class DataInitializer implements ApplicationRunner {
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
     private final PostRepository postRepository;
+    private final CommentRepository commentRepository;
+    private final PostLikeRepository postLikeRepository;
+    private final PostBookmarkRepository postBookmarkRepository;
     private final PasswordEncoder passwordEncoder;
     private final AppProperties appProperties;
 
@@ -41,12 +50,18 @@ public class DataInitializer implements ApplicationRunner {
             UserRepository userRepository,
             CategoryRepository categoryRepository,
             PostRepository postRepository,
+            CommentRepository commentRepository,
+            PostLikeRepository postLikeRepository,
+            PostBookmarkRepository postBookmarkRepository,
             PasswordEncoder passwordEncoder,
             AppProperties appProperties) {
         this.roleRepository = roleRepository;
         this.userRepository = userRepository;
         this.categoryRepository = categoryRepository;
         this.postRepository = postRepository;
+        this.commentRepository = commentRepository;
+        this.postLikeRepository = postLikeRepository;
+        this.postBookmarkRepository = postBookmarkRepository;
         this.passwordEncoder = passwordEncoder;
         this.appProperties = appProperties;
     }
@@ -97,6 +112,11 @@ public class DataInitializer implements ApplicationRunner {
         // Seed starter posts (idempotent — only if none exist)
         if (postRepository.count() == 0) {
             seedPosts(userProps.getUsername());
+        }
+
+        // Seed starter comments and likes (idempotent — only if none exist)
+        if (commentRepository.count() == 0) {
+            seedEngagement(userProps.getUsername(), adminProps.getUsername());
         }
     }
 
@@ -546,6 +566,43 @@ public class DataInitializer implements ApplicationRunner {
                 .build();
         categoryRepository.save(category);
         log.info("Seeded category: {}", name);
+    }
+
+    private void seedEngagement(String username, String adminUsername) {
+        User user = userRepository.findByUsername(username).orElse(null);
+        User admin = userRepository.findByUsername(adminUsername).orElse(null);
+        if (user == null) {
+            log.warn("Seed user '{}' not found; skipping engagement seeding", username);
+            return;
+        }
+
+        // Seed a few comments and likes on the first two published posts
+        List<Post> posts = postRepository.findAll().stream()
+                .filter(p -> p.getStatus() == PostStatus.PUBLISHED)
+                .limit(3)
+                .toList();
+
+        for (Post post : posts) {
+            commentRepository.save(Comment.builder()
+                    .content("Great article! Very informative and well-written.")
+                    .post(post)
+                    .author(user)
+                    .build());
+            if (admin != null) {
+                commentRepository.save(Comment.builder()
+                        .content("Thanks for sharing this. Bookmarked for later reference.")
+                        .post(post)
+                        .author(admin)
+                        .build());
+            }
+            if (!postLikeRepository.existsByUserIdAndPostId(user.getId(), post.getId())) {
+                postLikeRepository.save(PostLike.builder()
+                        .user(user)
+                        .post(post)
+                        .build());
+            }
+        }
+        log.info("Seeded starter comments and likes");
     }
 
     private Role ensureRole(RoleName name) {

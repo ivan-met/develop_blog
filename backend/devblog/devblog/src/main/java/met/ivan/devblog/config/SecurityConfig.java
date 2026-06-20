@@ -69,6 +69,7 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/posts/**").authenticated()
                         .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/posts/**").authenticated()
                         // Public reads
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/authors/**").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/posts/**", "/api/categories/**").permitAll()
                         .anyRequest().authenticated()
                 )

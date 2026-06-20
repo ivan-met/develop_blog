@@ -27,11 +27,42 @@ export interface PostSummaryResponse {
   createdAt: string
   tags: string[]
   viewCount: number
+  likeCount: number
 }
 
 export interface PostResponse extends PostSummaryResponse {
   contentMarkdown: string
   updatedAt: string
+  liked: boolean
+  bookmarked: boolean
+}
+
+// ─── Engagement domain ────────────────────────────────────────────────────────
+
+export interface CommentResponse {
+  id: number
+  content: string
+  author: AuthorSummary
+  createdAt: string
+  canDelete: boolean
+}
+
+export interface LikeResponse {
+  likeCount: number
+  liked: boolean
+}
+
+export interface BookmarkResponse {
+  bookmarked: boolean
+}
+
+export interface AuthorProfileResponse {
+  username: string
+  displayName: string | null
+  bio: string | null
+  avatarUrl: string | null
+  createdAt: string
+  postCount: number
 }
 
 // ─── Post request bodies ──────────────────────────────────────────────────────

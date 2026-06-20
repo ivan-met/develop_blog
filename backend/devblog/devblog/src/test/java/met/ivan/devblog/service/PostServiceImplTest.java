@@ -15,6 +15,8 @@ import met.ivan.devblog.exception.ForbiddenOperationException;
 import met.ivan.devblog.exception.ResourceNotFoundException;
 import met.ivan.devblog.mapper.PostMapper;
 import met.ivan.devblog.repository.CategoryRepository;
+import met.ivan.devblog.repository.PostBookmarkRepository;
+import met.ivan.devblog.repository.PostLikeRepository;
 import met.ivan.devblog.repository.PostRepository;
 import met.ivan.devblog.repository.UserRepository;
 import met.ivan.devblog.service.impl.PostServiceImpl;
@@ -23,7 +25,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -35,6 +36,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -54,8 +57,9 @@ class PostServiceImplTest {
     @Mock private UserRepository userRepository;
     @Mock private CategoryRepository categoryRepository;
     @Mock private PostMapper postMapper;
+    @Mock private PostLikeRepository postLikeRepository;
+    @Mock private PostBookmarkRepository postBookmarkRepository;
 
-    @InjectMocks
     private PostServiceImpl postService;
 
     private Role userRole;
@@ -68,6 +72,10 @@ class PostServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        postService = new PostServiceImpl(
+                postRepository, userRepository, categoryRepository, postMapper,
+                postLikeRepository, postBookmarkRepository);
+
         userRole = TestDataFactory.userRole();
         adminRole = TestDataFactory.adminRole();
         regularUser = TestDataFactory.userWithRole(userRole);
@@ -95,7 +103,7 @@ class PostServiceImplTest {
             return p;
         });
         PostResponse expected = mock(PostResponse.class);
-        when(postMapper.toResponse(any())).thenReturn(expected);
+        when(postMapper.toResponse(any(Post.class))).thenReturn(expected);
 
         PostResponse result = postService.create("testuser", req);
 
@@ -133,7 +141,7 @@ class PostServiceImplTest {
         when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
         when(postRepository.existsBySlug(anyString())).thenReturn(false);
         when(postRepository.save(any(Post.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(postMapper.toResponse(any())).thenAnswer(inv -> {
+        when(postMapper.toResponse(any(Post.class))).thenAnswer(inv -> {
             Post p = inv.getArgument(0);
             assertThat(p.getPublishedAt()).isNotNull();
             return mock(PostResponse.class);
@@ -152,7 +160,7 @@ class PostServiceImplTest {
         when(postRepository.existsBySlug("my-title")).thenReturn(true);
         when(postRepository.existsBySlug("my-title-2")).thenReturn(false);
         when(postRepository.save(any(Post.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(postMapper.toResponse(any())).thenReturn(mock(PostResponse.class));
+        when(postMapper.toResponse(any(Post.class))).thenReturn(mock(PostResponse.class));
 
         postService.create("testuser", req);
 
@@ -167,7 +175,7 @@ class PostServiceImplTest {
         when(userRepository.findByUsernameWithRoles("testuser")).thenReturn(Optional.of(regularUser));
         when(postRepository.existsBySlug(anyString())).thenReturn(false);
         when(postRepository.save(any(Post.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(postMapper.toResponse(any())).thenReturn(mock(PostResponse.class));
+        when(postMapper.toResponse(any(Post.class))).thenReturn(mock(PostResponse.class));
 
         postService.create("testuser", req);
 
@@ -188,7 +196,7 @@ class PostServiceImplTest {
         UserDetails principal = mockUserDetails("testuser", "ROLE_USER");
         when(postRepository.findByIdWithAuthorAndCategory(10L)).thenReturn(Optional.of(draftPost));
         when(postRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(postMapper.toResponse(any())).thenReturn(mock(PostResponse.class));
+        when(postMapper.toResponse(any(Post.class))).thenReturn(mock(PostResponse.class));
 
         postService.update(10L, principal, req);
 
@@ -203,7 +211,7 @@ class PostServiceImplTest {
         UserDetails adminPrincipal = mockUserDetails("admin", "ROLE_ADMIN");
         when(postRepository.findByIdWithAuthorAndCategory(10L)).thenReturn(Optional.of(draftPost));
         when(postRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(postMapper.toResponse(any())).thenReturn(mock(PostResponse.class));
+        when(postMapper.toResponse(any(Post.class))).thenReturn(mock(PostResponse.class));
 
         postService.update(10L, adminPrincipal, req);
 
@@ -228,7 +236,7 @@ class PostServiceImplTest {
         UserDetails principal = mockUserDetails("testuser", "ROLE_USER");
         when(postRepository.findByIdWithAuthorAndCategory(10L)).thenReturn(Optional.of(draftPost));
         when(postRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(postMapper.toResponse(any())).thenReturn(mock(PostResponse.class));
+        when(postMapper.toResponse(any(Post.class))).thenReturn(mock(PostResponse.class));
 
         postService.update(10L, principal, req);
 
@@ -248,7 +256,7 @@ class PostServiceImplTest {
         UserDetails principal = mockUserDetails("testuser", "ROLE_USER");
         when(postRepository.findByIdWithAuthorAndCategory(10L)).thenReturn(Optional.of(draftPost));
         when(postRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(postMapper.toResponse(any())).thenReturn(mock(PostResponse.class));
+        when(postMapper.toResponse(any(Post.class))).thenReturn(mock(PostResponse.class));
 
         postService.changeStatus(10L, principal, req);
 
@@ -326,23 +334,42 @@ class PostServiceImplTest {
     // --- getPublishedBySlug ---
 
     @Test
-    @DisplayName("getPublishedBySlug: returns published post and increments viewCount")
-    void getPublishedBySlug_found_incrementsViewCount() {
+    @DisplayName("getPublishedBySlug: returns published post, increments viewCount, resolves engagement for principal")
+    void getPublishedBySlug_found_incrementsViewCountAndEngagement() {
         publishedPost.setViewCount(5L);
         when(postRepository.findBySlugAndStatus("published-post", PostStatus.PUBLISHED))
                 .thenReturn(Optional.of(publishedPost));
         doNothing().when(postRepository).incrementViewCount(anyLong());
+        when(postLikeRepository.countByPostId(anyLong())).thenReturn(3L);
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(regularUser));
+        when(postLikeRepository.existsByUserIdAndPostId(anyLong(), anyLong())).thenReturn(true);
+        when(postBookmarkRepository.existsByUserIdAndPostId(anyLong(), anyLong())).thenReturn(false);
+        when(postMapper.toResponse(any(Post.class), anyLong(), any(Boolean.class), any(Boolean.class)))
+                .thenReturn(mock(PostResponse.class));
 
-        // The mapper receives the post with viewCount bumped
-        ArgumentCaptor<Post> captor = ArgumentCaptor.forClass(Post.class);
-        when(postMapper.toResponse(captor.capture())).thenReturn(mock(PostResponse.class));
-
-        PostResponse result = postService.getPublishedBySlug("published-post");
+        UserDetails principal = mockUserDetails("testuser", "ROLE_USER");
+        PostResponse result = postService.getPublishedBySlug("published-post", principal);
 
         assertThat(result).isNotNull();
         verify(postRepository).incrementViewCount(publishedPost.getId());
-        // Post viewCount was mutated to reflect the increment before mapping
-        assertThat(captor.getValue().getViewCount()).isEqualTo(6L);
+        verify(postMapper).toResponse(any(Post.class), eq(3L), eq(true), eq(false));
+    }
+
+    @Test
+    @DisplayName("getPublishedBySlug: anonymous gets null liked/bookmarked")
+    void getPublishedBySlug_anonymous_nullEngagement() {
+        publishedPost.setViewCount(5L);
+        when(postRepository.findBySlugAndStatus("published-post", PostStatus.PUBLISHED))
+                .thenReturn(Optional.of(publishedPost));
+        doNothing().when(postRepository).incrementViewCount(anyLong());
+        when(postLikeRepository.countByPostId(anyLong())).thenReturn(0L);
+        when(postMapper.toResponse(any(Post.class), anyLong(), isNull(), isNull()))
+                .thenReturn(mock(PostResponse.class));
+
+        PostResponse result = postService.getPublishedBySlug("published-post", null);
+
+        assertThat(result).isNotNull();
+        verify(postMapper).toResponse(any(Post.class), eq(0L), isNull(), isNull());
     }
 
     @Test
@@ -351,7 +378,7 @@ class PostServiceImplTest {
         when(postRepository.findBySlugAndStatus("test-post", PostStatus.PUBLISHED))
                 .thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> postService.getPublishedBySlug("test-post"))
+        assertThatThrownBy(() -> postService.getPublishedBySlug("test-post", null))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
@@ -364,7 +391,7 @@ class PostServiceImplTest {
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         when(postRepository.findAll(any(Specification.class), pageableCaptor.capture())).thenReturn(emptyPage);
 
-        postService.listPublished(null, null, "latest", PageRequest.of(0, 10));
+        postService.listPublished(null, null, "latest", PageRequest.of(0, 10), null);
 
         Sort sort = pageableCaptor.getValue().getSort();
         assertThat(sort.getOrderFor("publishedAt")).isNotNull();
@@ -378,7 +405,7 @@ class PostServiceImplTest {
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         when(postRepository.findAll(any(Specification.class), pageableCaptor.capture())).thenReturn(emptyPage);
 
-        postService.listPublished(null, null, "popular", PageRequest.of(0, 10));
+        postService.listPublished(null, null, "popular", PageRequest.of(0, 10), null);
 
         Sort sort = pageableCaptor.getValue().getSort();
         assertThat(sort.getOrderFor("viewCount")).isNotNull();
@@ -394,11 +421,28 @@ class PostServiceImplTest {
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         when(postRepository.findAll(any(Specification.class), pageableCaptor.capture())).thenReturn(emptyPage);
 
-        postService.listPublished(null, null, null, PageRequest.of(0, 10));
+        postService.listPublished(null, null, null, PageRequest.of(0, 10), null);
 
         Sort sort = pageableCaptor.getValue().getSort();
         assertThat(sort.getOrderFor("publishedAt")).isNotNull();
         assertThat(sort.getOrderFor("publishedAt").getDirection()).isEqualTo(Sort.Direction.DESC);
+    }
+
+    @Test
+    @DisplayName("listPublished: like counts are batch-fetched and applied to summaries")
+    void listPublished_batchLikeCounts_applied() {
+        Post post = publishedPost;
+        Page<Post> onePage = new PageImpl<>(List.of(post));
+        when(postRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(onePage);
+        // Return count=7 for the post
+        when(postLikeRepository.countsByPostIds(List.of(post.getId())))
+                .thenReturn(Collections.singletonList(new Object[]{post.getId(), 7L}));
+        when(postMapper.toSummary(eq(post), eq(7L))).thenReturn(mock(PostSummaryResponse.class));
+
+        Page<PostSummaryResponse> result = postService.listPublished(null, null, null, PageRequest.of(0, 10), null);
+
+        assertThat(result.getContent()).hasSize(1);
+        verify(postMapper).toSummary(post, 7L);
     }
 
     // --- helpers ---
@@ -406,7 +450,7 @@ class PostServiceImplTest {
     private UserDetails mockUserDetails(String username, String... roles) {
         UserDetails ud = mock(UserDetails.class);
         lenient().when(ud.getUsername()).thenReturn(username);
-        List<SimpleGrantedAuthority> authorities = java.util.Arrays.stream(roles)
+        List<SimpleGrantedAuthority> authorities = Arrays.stream(roles)
                 .map(SimpleGrantedAuthority::new)
                 .toList();
         lenient().doReturn(authorities).when(ud).getAuthorities();

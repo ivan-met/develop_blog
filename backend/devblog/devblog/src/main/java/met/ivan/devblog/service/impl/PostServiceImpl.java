@@ -17,6 +17,8 @@ import met.ivan.devblog.exception.ForbiddenOperationException;
 import met.ivan.devblog.exception.ResourceNotFoundException;
 import met.ivan.devblog.mapper.PostMapper;
 import met.ivan.devblog.repository.CategoryRepository;
+import met.ivan.devblog.repository.PostBookmarkRepository;
+import met.ivan.devblog.repository.PostLikeRepository;
 import met.ivan.devblog.repository.PostRepository;
 import met.ivan.devblog.repository.UserRepository;
 import met.ivan.devblog.service.PostService;
@@ -33,8 +35,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -46,16 +50,22 @@ public class PostServiceImpl implements PostService {
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
     private final PostMapper postMapper;
+    private final PostLikeRepository postLikeRepository;
+    private final PostBookmarkRepository postBookmarkRepository;
 
     public PostServiceImpl(
             PostRepository postRepository,
             UserRepository userRepository,
             CategoryRepository categoryRepository,
-            PostMapper postMapper) {
+            PostMapper postMapper,
+            PostLikeRepository postLikeRepository,
+            PostBookmarkRepository postBookmarkRepository) {
         this.postRepository = postRepository;
         this.userRepository = userRepository;
         this.categoryRepository = categoryRepository;
         this.postMapper = postMapper;
+        this.postLikeRepository = postLikeRepository;
+        this.postBookmarkRepository = postBookmarkRepository;
     }
 
     @Override
@@ -139,23 +149,42 @@ public class PostServiceImpl implements PostService {
 
     @Override
     @Transactional
-    public PostResponse getPublishedBySlug(String slug) {
+    public PostResponse getPublishedBySlug(String slug, UserDetails principal) {
         Post post = postRepository.findBySlugAndStatus(slug, PostStatus.PUBLISHED)
                 .orElseThrow(() -> new ResourceNotFoundException("Published post not found with slug: " + slug));
         postRepository.incrementViewCount(post.getId());
-        // Reflect the incremented count in the response without re-querying
         post.setViewCount(post.getViewCount() + 1);
-        return postMapper.toResponse(post);
+
+        Long likeCount = postLikeRepository.countByPostId(post.getId());
+
+        Boolean liked = null;
+        Boolean bookmarked = null;
+        if (principal != null) {
+            User user = userRepository.findByUsername(principal.getUsername()).orElse(null);
+            if (user != null) {
+                liked = postLikeRepository.existsByUserIdAndPostId(user.getId(), post.getId());
+                bookmarked = postBookmarkRepository.existsByUserIdAndPostId(user.getId(), post.getId());
+            }
+        }
+
+        return postMapper.toResponse(post, likeCount, liked, bookmarked);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<PostSummaryResponse> listPublished(String categorySlug, String search, String sort, Pageable pageable) {
+    public Page<PostSummaryResponse> listPublished(String categorySlug, String search, String sort,
+                                                    Pageable pageable, UserDetails principal) {
         Sort resolvedSort = resolveSort(sort);
         Pageable sortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), resolvedSort);
         Specification<Post> spec = buildPublishedSpec(categorySlug, search);
-        return postRepository.findAll(spec, sortedPageable)
-                .map(postMapper::toSummary);
+
+        Page<Post> postPage = postRepository.findAll(spec, sortedPageable);
+
+        // Batch like counts — one query for the entire page, not per-row
+        List<Long> postIds = postPage.getContent().stream().map(Post::getId).toList();
+        Map<Long, Long> likeCountsByPostId = batchLikeCounts(postIds);
+
+        return postPage.map(post -> postMapper.toSummary(post, likeCountsByPostId.getOrDefault(post.getId(), 0L)));
     }
 
     @Override
@@ -175,6 +204,18 @@ public class PostServiceImpl implements PostService {
     }
 
     // --- helpers ---
+
+    private Map<Long, Long> batchLikeCounts(List<Long> postIds) {
+        if (postIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<Object[]> rows = postLikeRepository.countsByPostIds(postIds);
+        return rows.stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> (Long) row[1]
+                ));
+    }
 
     private Sort resolveSort(String sort) {
         if ("popular".equalsIgnoreCase(sort)) {

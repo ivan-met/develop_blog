@@ -23,4 +23,6 @@ public class PostSummaryResponse {
     private final Instant createdAt;
     private final Set<String> tags;
     private final Long viewCount;
+    // Engagement field (public aggregate only)
+    private final Long likeCount;
 }

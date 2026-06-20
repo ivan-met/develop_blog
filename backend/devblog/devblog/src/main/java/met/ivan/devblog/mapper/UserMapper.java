@@ -1,5 +1,6 @@
 package met.ivan.devblog.mapper;
 
+import met.ivan.devblog.dto.AuthorProfileResponse;
 import met.ivan.devblog.dto.UserResponse;
 import met.ivan.devblog.entity.Role;
 import met.ivan.devblog.entity.User;
@@ -27,6 +28,20 @@ public class UserMapper {
                 roles,
                 user.isActive(),
                 user.getCreatedAt()
+        );
+    }
+
+    /**
+     * Map to public author profile — deliberately omits email, roles, id, and active status.
+     */
+    public AuthorProfileResponse toAuthorProfile(User user, long postCount) {
+        return new AuthorProfileResponse(
+                user.getUsername(),
+                user.getDisplayName(),
+                user.getBio(),
+                user.getAvatarUrl(),
+                user.getCreatedAt(),
+                postCount
         );
     }
 }
