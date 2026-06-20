@@ -17,26 +17,58 @@ discovering technical content to foster knowledge sharing across technology comm
 
 ### Backend
 - Java 21
-- Spring Boot
-- Spring Security
-- Spring Data JPA + QueryDSL
-- SQLite
-- JWT
+- Spring Boot 4 (Web MVC, Validation, JSON)
+- Spring Security 6 (stateless JWT)
+- Spring Data JPA + Hibernate (SQLite community dialect)
+- SQLite (`sqlite-jdbc`)
+- JWT (`io.jsonwebtoken` / jjwt)
+- Lombok
+
+> QueryDSL is named as an aspiration in the original stack but is **not** currently
+> wired into `pom.xml`; persistence uses plain Spring Data JPA today.
 
 ### Frontend
-- Vue 3 (Composition API)
+- Vue 3 (Composition API, `<script setup>`)
 - TypeScript
-- Tailwind CSS
+- Vite
+- Tailwind CSS 4
+- Pinia (state) + Vue Router
+- Axios (API client)
+- markdown-it + highlight.js + DOMPurify (Markdown rendering & sanitization)
+- Vitest + Vue Test Utils (testing)
 
 ## Repository Layout
 
 ```
 develop_blog/
-├── backend/devblog/devblog/   # Spring Boot Maven project (package: met.ivan.devblog)
+├── backend/devblog/devblog/        # Spring Boot Maven project (package: met.ivan.devblog)
 │   ├── pom.xml
-│   ├── mvnw / mvnw.cmd         # Maven wrapper
-│   └── src/main/java/met/ivan/devblog/DevblogApplication.java
-└── frontend/                  # Vue 3 app (not yet created)
+│   ├── mvnw / mvnw.cmd              # Maven wrapper
+│   └── src/
+│       ├── main/java/met/ivan/devblog/
+│       │   ├── config/             # Security, app properties, data seeding
+│       │   ├── controller/         # REST controllers + global exception handler
+│       │   ├── dto/                # Request/response DTOs (API boundary)
+│       │   ├── entity/             # JPA entities (User, Role, Post, Category, RefreshToken)
+│       │   ├── exception/          # Domain exceptions
+│       │   ├── mapper/             # Entity ⇄ DTO mappers
+│       │   ├── repository/         # Spring Data JPA repositories
+│       │   ├── security/           # JWT service, auth filter, user details service
+│       │   ├── service/            # Business logic (interfaces + impl)
+│       │   └── util/               # Helpers (e.g. slug generation)
+│       ├── main/resources/application.yaml
+│       └── test/                   # Unit, slice, and integration tests
+└── frontend/                       # Vue 3 + TypeScript SPA
+    ├── package.json
+    ├── vite.config.ts              # Vite config + /api dev proxy
+    └── src/
+        ├── api/                    # Axios client, typed endpoints (auth, posts, …)
+        ├── components/             # Reusable UI components
+        ├── composables/           # Reusable composition functions
+        ├── router/                 # Vue Router + route guards
+        ├── stores/                 # Pinia stores (auth, …)
+        ├── views/                  # Page-level components (incl. admin/)
+        └── test/                   # Vitest tests
 ```
 
 > Note: the Maven project currently lives at the nested path
@@ -45,29 +77,38 @@ develop_blog/
 ## Build & Run
 
 ### Backend (from `backend/devblog/devblog/`)
-- Run: `./mvnw spring-boot:run` (Windows: `mvnw.cmd spring-boot:run`)
+- Run: `./mvnw spring-boot:run` (Windows: `mvnw.cmd spring-boot:run`) — serves on `:8080`
 - Test: `./mvnw test`
 - Package: `./mvnw clean package`
 
-### Frontend (from `frontend/`, once scaffolded)
+### Frontend (from `frontend/`)
 - Install: `npm install`
-- Dev server: `npm run dev`
+- Dev server: `npm run dev` — serves on `:5173`, proxies `/api` to `:8080`
 - Build: `npm run build`
+- Test: `npm test`
+- Lint (type-check): `npm run lint`
 
 ## Current State
 
-This is an early-stage scaffold. As of now:
-- Backend is a fresh Spring Boot project (Java 21, package `met.ivan.devblog`) with
-  Spring Data JPA, Spring Web MVC, SQLite (`sqlite-jdbc`), Lombok, and DevTools wired in.
-- **Not yet added** (planned per the stack above): Spring Security, JWT, and QueryDSL.
-- Frontend has not been scaffolded yet.
-- Domain model, REST API, persistence config, and auth are still to be built.
+Both halves are implemented and functional:
+- **Backend** — Spring Boot 4 REST API (Java 21, package `met.ivan.devblog`) with Spring
+  Security + JWT auth (access/refresh tokens), Spring Data JPA over SQLite, BCrypt
+  password hashing, CORS for the SPA, and a global exception handler. Domains: users,
+  roles, posts (Markdown, draft/published lifecycle, slugs), and categories. On startup
+  `DataInitializer` seeds roles, a default admin/user, and starter categories.
+- **Frontend** — Vue 3 + TypeScript SPA (Pinia, Vue Router with auth guards, typed Axios
+  client) covering auth, profile, post authoring, public browsing, and admin views.
+- **Config/secrets** — `application.yaml` exposes env-overridable settings (`JWT_SECRET`,
+  token expirations, `CORS_ALLOWED_ORIGINS`, `SEED_*` credentials).
+- Tests exist on both sides (backend unit/slice/integration; frontend Vitest).
+
+See `README.md` for the full REST API reference, configuration table, and domain model.
 
 ## Conventions
 
 - Backend base package: `met.ivan.devblog`. Organize by feature/layer
   (e.g. `controller`, `service`, `repository`, `entity`, `dto`, `config`, `security`).
-- Expose functionality as RESTful endpoints under a versioned base path (e.g. `/api/...`).
+- Expose functionality as RESTful endpoints under the `/api` base path.
 - Use DTOs at the API boundary; do not expose JPA entities directly.
 - Lombok is available — prefer it for boilerplate (getters/setters/builders).
 - Keep secrets (JWT signing keys, etc.) out of source; use config/env, not hardcoded values.
