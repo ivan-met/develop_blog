@@ -46,6 +46,12 @@ communities.
   view count.
 - **Categories** — posts are organized under technology categories (Java, Spring, Vue,
   DevOps, …), managed by administrators.
+- **Engagement** — authenticated readers can comment on published posts (flat,
+  newest-first list), **like** posts (public popularity counter, idempotent toggle), and
+  **bookmark** posts to a private save-for-later list. Comments can be deleted by their
+  author, the post author, or an admin.
+- **Author profiles** — public pages at `/authors/:username` showing an author's display
+  name, bio, avatar, join date, and their published posts (never exposing email/roles).
 - **Role-based administration** — admins manage users (roles, active status) and
   categories.
 - **Secure by default** — stateless JWT auth, BCrypt password hashing, method-level
@@ -233,6 +239,9 @@ On startup `DataInitializer` ensures the following exist (all idempotent):
   across the seeded categories with varied tags, staggered publish dates, and view counts
   so discovery (Latest / Most Popular, search, category filter) has realistic data (only
   seeded when no posts exist).
+- **Starter engagement:** a few comments and likes on the starter posts (authored by the
+  seed users) so the post detail view has content on first run (only seeded when no
+  comments exist).
 
 > ⚠️ The default credentials are for local development only. Override the `SEED_*`
 > variables (and `JWT_SECRET`) before deploying anywhere shared.
@@ -261,13 +270,14 @@ Base path: `/api`. All request/response bodies are JSON. Protected endpoints exp
 | `GET` | `/me` | Get the current user's profile. |
 | `PUT` | `/me` | Update the current user's profile. |
 | `PUT` | `/me/password` | Change the current user's password. `204 No Content`. |
+| `GET` | `/me/bookmarks` | List the caller's bookmarked posts (paginated `PostSummaryResponse`). |
 
 ### Posts — `/api/posts`
 
 | Method | Path | Auth | Description |
 | --- | --- | --- | --- |
-| `GET` | `/` | Public | List published posts. Query: `category`, `search` (title/content/tags), `sort` (`latest` \| `popular`), pagination. |
-| `GET` | `/{slug}` | Public | Get a published post by slug (increments its view count). |
+| `GET` | `/` | Public | List published posts. Query: `category`, `search` (title/content/tags), `sort` (`latest` \| `popular`), pagination. Each card carries `likeCount`. |
+| `GET` | `/{slug}` | Public | Get a published post by slug (increments its view count). Response carries `likeCount`, plus `liked`/`bookmarked` when a user is authenticated. |
 | `GET` | `/mine` | Authenticated | List the caller's own posts. Query: `status`, pagination. |
 | `GET` | `/mine/{id}` | Authenticated | Get one of the caller's own posts by id. |
 | `POST` | `/` | Authenticated | Create a post. `201 Created`. |
@@ -281,6 +291,35 @@ Base path: `/api`. All request/response bodies are JSON. Protected endpoints exp
 | --- | --- | --- |
 | `GET` | `/` | List all categories. |
 | `GET` | `/{slug}` | Get a category by slug. |
+
+### Comments — `/api/posts/{slug}/comments` & `/api/comments`
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| `GET` | `/api/posts/{slug}/comments` | Public | List a published post's comments, newest first (paginated). |
+| `POST` | `/api/posts/{slug}/comments` | Authenticated | Add a comment (body `{ content }`). `201 Created`. |
+| `DELETE` | `/api/comments/{id}` | Comment author, post author, or `ADMIN` | Delete a comment. `204 No Content`. |
+
+`CommentResponse`: `{ id, content, author, createdAt, canDelete }` (`canDelete` is
+computed per requesting principal).
+
+### Likes & Bookmarks — `/api/posts/{slug}` (authenticated)
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `POST` | `/like` | Like the post (idempotent). Returns `{ likeCount, liked }`. |
+| `DELETE` | `/like` | Remove a like (idempotent). Returns `{ likeCount, liked }`. |
+| `POST` | `/bookmark` | Bookmark the post. Returns `{ bookmarked }`. |
+| `DELETE` | `/bookmark` | Remove a bookmark. Returns `{ bookmarked }`. |
+
+(The caller's bookmarks are listed via `GET /api/users/me/bookmarks` — see Users above.)
+
+### Authors — `/api/authors` (public)
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/{username}` | Public author profile (`AuthorProfileResponse`: `username`, `displayName`, `bio`, `avatarUrl`, `createdAt`, `postCount`). Never exposes email/roles/id. |
+| `GET` | `/{username}/posts` | The author's published posts (paginated `PostSummaryResponse`). |
 
 ### Admin — Users — `/api/admin/users` (role `ADMIN`)
 
@@ -316,6 +355,16 @@ handler, with appropriate HTTP status codes (`400`, `401`, `403`, `404`, `409`, 
   free-form `tags` (`@ElementCollection`, normalized lowercase), a `viewCount` popularity
   counter, `publishedAt`, and audit timestamps (`createdAt`, `updatedAt`) with
   optimistic-locking `version`. Indexed on slug, status, author, and tag.
+- **Comment** — Markdown/plain `content`, the `Post` it belongs to, its `author` (`User`),
+  and `createdAt`. Indexed on `post_id`; listed newest-first.
+- **PostLike** — a (`user`, `post`) pair with a unique constraint, backing the public like
+  counter. Likes are idempotent — one per user per post.
+- **PostBookmark** — same shape as `PostLike` (separate table, unique `user`+`post`),
+  backing each user's private bookmark list.
+
+API payloads enrich posts with engagement data: `PostResponse` adds `likeCount`, plus
+`liked`/`bookmarked` for the authenticated caller; `PostSummaryResponse` (list cards) adds
+`likeCount`.
 
 ---
 
@@ -329,8 +378,10 @@ handler, with appropriate HTTP status codes (`400`, `401`, `403`, `404`, `409`, 
 - **Passwords** — hashed with BCrypt (strength 12).
 - **Authorization rules** (see `SecurityConfig`):
   - `/api/auth/**` — public.
-  - `GET /api/posts/**`, `GET /api/categories/**` — public reads.
-  - `/api/posts` write operations and `/api/posts/mine/**` — authenticated.
+  - `GET /api/posts/**` (incl. comments), `GET /api/categories/**`,
+    `GET /api/authors/**` — public reads.
+  - `/api/posts` write operations and `/api/posts/mine/**`, comment writes, and
+    like/bookmark toggles — authenticated.
   - `/api/users/**` — authenticated.
   - `/api/admin/**` — requires role `ADMIN` (also enforced at method level via
     `@PreAuthorize`).
