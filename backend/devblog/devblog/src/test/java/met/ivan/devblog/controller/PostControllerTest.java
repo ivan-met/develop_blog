@@ -31,11 +31,12 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -65,7 +66,8 @@ class PostControllerTest {
         AuthorSummary author = new AuthorSummary(1L, "testuser", "Test User");
         CategoryResponse cat = new CategoryResponse(1L, "Java", "java", null);
         return new PostSummaryResponse(10L, "test-post", "Test Post", "Excerpt",
-                PostStatus.PUBLISHED, cat, author, Instant.now(), Instant.now());
+                PostStatus.PUBLISHED, cat, author, Instant.now(), Instant.now(),
+                Set.of("java", "spring"), 42L);
     }
 
     private PostResponse sampleResponse() {
@@ -73,7 +75,7 @@ class PostControllerTest {
         CategoryResponse cat = new CategoryResponse(1L, "Java", "java", null);
         return new PostResponse(10L, "test-post", "Test Post", "Excerpt",
                 PostStatus.PUBLISHED, cat, author, Instant.now(), Instant.now(),
-                "# Content", Instant.now());
+                "# Content", Instant.now(), Set.of("java", "spring"), 42L);
     }
 
     // --- Public GET /api/posts ---
@@ -82,11 +84,36 @@ class PostControllerTest {
     @DisplayName("GET /api/posts - anonymous can list published posts (200)")
     void listPublished_anonymous_returns200() throws Exception {
         Page<PostSummaryResponse> page = new PageImpl<>(List.of(sampleSummary()), PageRequest.of(0, 20), 1);
-        when(postService.listPublished(isNull(), isNull(), any())).thenReturn(page);
+        when(postService.listPublished(isNull(), isNull(), isNull(), any())).thenReturn(page);
 
         mockMvc.perform(get("/api/posts"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].slug").value("test-post"));
+    }
+
+    @Test
+    @DisplayName("GET /api/posts?sort=popular - passes sort param to service")
+    void listPublished_sortPopular_passesToService() throws Exception {
+        Page<PostSummaryResponse> page = new PageImpl<>(List.of(sampleSummary()), PageRequest.of(0, 20), 1);
+        when(postService.listPublished(isNull(), isNull(), eq("popular"), any())).thenReturn(page);
+
+        mockMvc.perform(get("/api/posts").param("sort", "popular"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].slug").value("test-post"));
+
+        verify(postService).listPublished(isNull(), isNull(), eq("popular"), any());
+    }
+
+    @Test
+    @DisplayName("GET /api/posts - response JSON includes tags and viewCount")
+    void listPublished_responseIncludesTagsAndViewCount() throws Exception {
+        Page<PostSummaryResponse> page = new PageImpl<>(List.of(sampleSummary()), PageRequest.of(0, 20), 1);
+        when(postService.listPublished(any(), any(), any(), any())).thenReturn(page);
+
+        mockMvc.perform(get("/api/posts"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].viewCount").value(42))
+                .andExpect(jsonPath("$.content[0].tags").isArray());
     }
 
     @Test
@@ -97,7 +124,9 @@ class PostControllerTest {
         mockMvc.perform(get("/api/posts/test-post"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.slug").value("test-post"))
-                .andExpect(jsonPath("$.contentMarkdown").value("# Content"));
+                .andExpect(jsonPath("$.contentMarkdown").value("# Content"))
+                .andExpect(jsonPath("$.tags").isArray())
+                .andExpect(jsonPath("$.viewCount").value(42));
     }
 
     @Test
@@ -115,7 +144,7 @@ class PostControllerTest {
     @Test
     @DisplayName("POST /api/posts - anonymous returns 401")
     void createPost_anonymous_returns401() throws Exception {
-        CreatePostRequest req = new CreatePostRequest("Title", "Content", null, null, PostStatus.DRAFT);
+        CreatePostRequest req = new CreatePostRequest("Title", "Content", null, null, PostStatus.DRAFT, null);
 
         mockMvc.perform(post("/api/posts")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -127,7 +156,7 @@ class PostControllerTest {
     @DisplayName("POST /api/posts - USER role returns 201")
     @WithMockUser(username = "testuser", roles = "USER")
     void createPost_user_returns201() throws Exception {
-        CreatePostRequest req = new CreatePostRequest("Title", "Content", null, null, PostStatus.DRAFT);
+        CreatePostRequest req = new CreatePostRequest("Title", "Content", null, null, PostStatus.DRAFT, Set.of("java"));
         when(postService.create(eq("testuser"), any())).thenReturn(sampleResponse());
 
         mockMvc.perform(post("/api/posts")
@@ -141,7 +170,7 @@ class PostControllerTest {
     @DisplayName("POST /api/posts - ADMIN role returns 403 (service throws ForbiddenOperationException)")
     @WithMockUser(username = "admin", roles = "ADMIN")
     void createPost_admin_returns403() throws Exception {
-        CreatePostRequest req = new CreatePostRequest("Title", "Content", null, null, PostStatus.DRAFT);
+        CreatePostRequest req = new CreatePostRequest("Title", "Content", null, null, PostStatus.DRAFT, null);
         when(postService.create(eq("admin"), any()))
                 .thenThrow(new ForbiddenOperationException("Administrators are not permitted to author posts"));
 

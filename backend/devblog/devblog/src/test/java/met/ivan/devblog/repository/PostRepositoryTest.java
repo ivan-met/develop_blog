@@ -14,10 +14,17 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.context.ActiveProfiles;
 
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -63,6 +70,22 @@ class PostRepositoryTest {
                 .status(status)
                 .author(author)
                 .category(cat)
+                .build();
+        return em.persistAndFlush(p);
+    }
+
+    private Post savePostFull(String title, String slug, PostStatus status, Category cat,
+                              String content, Set<String> tags, long viewCount, Instant publishedAt) {
+        Post p = Post.builder()
+                .title(title)
+                .slug(slug)
+                .contentMarkdown(content)
+                .status(status)
+                .author(author)
+                .category(cat)
+                .tags(new LinkedHashSet<>(tags))
+                .viewCount(viewCount)
+                .publishedAt(publishedAt)
                 .build();
         return em.persistAndFlush(p);
     }
@@ -186,5 +209,108 @@ class PostRepositoryTest {
 
         assertThatThrownBy(() -> em.persistAndFlush(dup))
                 .isInstanceOf(Exception.class);
+    }
+
+    // --- Tags and viewCount tests ---
+
+    @Test
+    @DisplayName("Specification: search matches on contentMarkdown (not just title)")
+    void specification_contentSearch() {
+        Instant now = Instant.now();
+        savePostFull("About Streams", "about-streams", PostStatus.PUBLISHED, category,
+                "Java streams are lazy evaluated functional pipelines", Set.of("java"), 0L, now);
+        savePostFull("Vue Components", "vue-components", PostStatus.PUBLISHED, category,
+                "Vue single file components provide a clean structure", Set.of("vue"), 0L, now);
+        em.clear();
+
+        Specification<Post> spec = (root, query, cb) -> {
+            String pattern = "%lazy evaluated%";
+            return cb.like(cb.lower(root.get("contentMarkdown")), pattern);
+        };
+        Page<Post> page = postRepository.findAll(spec, PageRequest.of(0, 10));
+
+        assertThat(page.getTotalElements()).isEqualTo(1);
+        assertThat(page.getContent().get(0).getSlug()).isEqualTo("about-streams");
+    }
+
+    @Test
+    @DisplayName("Specification: search matches on tag value")
+    void specification_tagSearch() {
+        Instant now = Instant.now();
+        savePostFull("Spring Security Post", "spring-sec-post", PostStatus.PUBLISHED, category,
+                "Spring Security content here", Set.of("spring-security", "jwt"), 0L, now);
+        savePostFull("Vue Guide", "vue-guide-tag", PostStatus.PUBLISHED, category,
+                "Vue guide content", Set.of("vue3", "typescript"), 0L, now);
+        em.clear();
+
+        Specification<Post> spec = (root, query, cb) -> {
+            String pattern = "%jwt%";
+            Join<Post, String> tagJoin = root.join("tags", JoinType.LEFT);
+            query.distinct(true);
+            return cb.like(cb.lower(tagJoin), pattern);
+        };
+        Page<Post> page = postRepository.findAll(spec, PageRequest.of(0, 10));
+
+        assertThat(page.getTotalElements()).isEqualTo(1);
+        assertThat(page.getContent().get(0).getSlug()).isEqualTo("spring-sec-post");
+    }
+
+    @Test
+    @DisplayName("incrementViewCount: atomically increments count by 1")
+    void incrementViewCount_raisesValue() {
+        Instant now = Instant.now();
+        Post post = savePostFull("View Test Post", "view-test-post", PostStatus.PUBLISHED, category,
+                "Content", Set.of("test"), 10L, now);
+        em.clear();
+
+        postRepository.incrementViewCount(post.getId());
+        em.clear();
+
+        Post updated = postRepository.findById(post.getId()).orElseThrow();
+        assertThat(updated.getViewCount()).isEqualTo(11L);
+    }
+
+    @Test
+    @DisplayName("Sort: POPULAR order returns highest viewCount first")
+    void sort_popular_highestViewCountFirst() {
+        Instant now = Instant.now();
+        savePostFull("Low Views", "low-views", PostStatus.PUBLISHED, category,
+                "Content", Set.of(), 10L, now.minus(3, ChronoUnit.DAYS));
+        savePostFull("High Views", "high-views", PostStatus.PUBLISHED, category,
+                "Content", Set.of(), 500L, now.minus(1, ChronoUnit.DAYS));
+        savePostFull("Mid Views", "mid-views", PostStatus.PUBLISHED, category,
+                "Content", Set.of(), 100L, now.minus(2, ChronoUnit.DAYS));
+        em.clear();
+
+        Page<Post> page = postRepository.findAll(
+                (root, query, cb) -> cb.equal(root.get("status"), PostStatus.PUBLISHED),
+                PageRequest.of(0, 10, Sort.by(Sort.Order.desc("viewCount"), Sort.Order.desc("publishedAt"))));
+
+        List<Post> posts = page.getContent();
+        assertThat(posts.get(0).getSlug()).isEqualTo("high-views");
+        assertThat(posts.get(1).getSlug()).isEqualTo("mid-views");
+        assertThat(posts.get(2).getSlug()).isEqualTo("low-views");
+    }
+
+    @Test
+    @DisplayName("Sort: LATEST order returns most recently published first")
+    void sort_latest_mostRecentFirst() {
+        Instant now = Instant.now();
+        savePostFull("Oldest", "oldest-post", PostStatus.PUBLISHED, category,
+                "Content", Set.of(), 100L, now.minus(10, ChronoUnit.DAYS));
+        savePostFull("Newest", "newest-post", PostStatus.PUBLISHED, category,
+                "Content", Set.of(), 5L, now.minus(1, ChronoUnit.DAYS));
+        savePostFull("Middle", "middle-post", PostStatus.PUBLISHED, category,
+                "Content", Set.of(), 50L, now.minus(5, ChronoUnit.DAYS));
+        em.clear();
+
+        Page<Post> page = postRepository.findAll(
+                (root, query, cb) -> cb.equal(root.get("status"), PostStatus.PUBLISHED),
+                PageRequest.of(0, 10, Sort.by(Sort.Order.desc("publishedAt"))));
+
+        List<Post> posts = page.getContent();
+        assertThat(posts.get(0).getSlug()).isEqualTo("newest-post");
+        assertThat(posts.get(1).getSlug()).isEqualTo("middle-post");
+        assertThat(posts.get(2).getSlug()).isEqualTo("oldest-post");
     }
 }

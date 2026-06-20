@@ -5,6 +5,7 @@ import met.ivan.devblog.entity.Post;
 import met.ivan.devblog.entity.PostStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -26,4 +27,10 @@ public interface PostRepository extends JpaRepository<Post, Long>, JpaSpecificat
     boolean existsBySlug(String slug);
 
     boolean existsByCategory(Category category);
+
+    long countByAuthorUsername(String username);
+
+    @Modifying
+    @Query("UPDATE Post p SET p.viewCount = p.viewCount + 1 WHERE p.id = :id")
+    void incrementViewCount(@Param("id") Long id);
 }

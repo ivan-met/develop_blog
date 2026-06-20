@@ -6,6 +6,8 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.Set;
+
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
@@ -22,4 +24,7 @@ public class UpdatePostRequest {
     private String excerpt;
 
     private Long categoryId;
+
+    @Size(max = 10, message = "A post may have at most 10 tags")
+    private Set<@Size(max = 50, message = "Each tag must not exceed 50 characters") String> tags;
 }

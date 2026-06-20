@@ -38,6 +38,8 @@ const mockDraftPost = {
   author: { id: 1, username: 'alice', displayName: 'Alice' },
   publishedAt: null,
   createdAt: '2025-01-01T00:00:00Z',
+  tags: [] as string[],
+  viewCount: 0,
 }
 
 const mockPublishedPost = {
@@ -50,6 +52,8 @@ const mockPublishedPost = {
   author: { id: 1, username: 'alice', displayName: 'Alice' },
   publishedAt: '2025-01-02T00:00:00Z',
   createdAt: '2025-01-01T00:00:00Z',
+  tags: [] as string[],
+  viewCount: 5,
 }
 
 const mockPage = (content: PostSummaryResponse[]) => ({

@@ -15,6 +15,7 @@ export const postsApi = {
   listPublished(params: {
     category?: string
     search?: string
+    sort?: 'latest' | 'popular'
     page?: number
     size?: number
   }): Promise<Page<PostSummaryResponse>> {

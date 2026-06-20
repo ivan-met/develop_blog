@@ -25,6 +25,8 @@ export interface PostSummaryResponse {
   author: AuthorSummary
   publishedAt: string | null
   createdAt: string
+  tags: string[]
+  viewCount: number
 }
 
 export interface PostResponse extends PostSummaryResponse {
@@ -40,6 +42,7 @@ export interface CreatePostRequest {
   excerpt?: string
   categoryId?: number
   status?: PostStatus
+  tags?: string[]
 }
 
 export interface UpdatePostRequest {
@@ -47,6 +50,7 @@ export interface UpdatePostRequest {
   contentMarkdown: string
   excerpt?: string
   categoryId?: number
+  tags?: string[]
 }
 
 export interface UpdatePostStatusRequest {

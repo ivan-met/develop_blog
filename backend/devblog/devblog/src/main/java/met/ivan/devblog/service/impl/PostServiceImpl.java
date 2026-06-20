@@ -22,7 +22,9 @@ import met.ivan.devblog.repository.UserRepository;
 import met.ivan.devblog.service.PostService;
 import met.ivan.devblog.util.Slugs;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -31,7 +33,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -81,6 +86,7 @@ public class PostServiceImpl implements PostService {
                 .status(status)
                 .author(author)
                 .category(category)
+                .tags(normalizeTags(request.getTags()))
                 .publishedAt(status == PostStatus.PUBLISHED ? Instant.now() : null)
                 .build();
 
@@ -99,6 +105,7 @@ public class PostServiceImpl implements PostService {
         post.setContentMarkdown(request.getContentMarkdown());
         post.setExcerpt(request.getExcerpt());
         post.setCategory(category);
+        post.setTags(normalizeTags(request.getTags()));
         // slug remains stable on update
 
         post = postRepository.save(post);
@@ -131,18 +138,23 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public PostResponse getPublishedBySlug(String slug) {
         Post post = postRepository.findBySlugAndStatus(slug, PostStatus.PUBLISHED)
                 .orElseThrow(() -> new ResourceNotFoundException("Published post not found with slug: " + slug));
+        postRepository.incrementViewCount(post.getId());
+        // Reflect the incremented count in the response without re-querying
+        post.setViewCount(post.getViewCount() + 1);
         return postMapper.toResponse(post);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<PostSummaryResponse> listPublished(String categorySlug, String search, Pageable pageable) {
+    public Page<PostSummaryResponse> listPublished(String categorySlug, String search, String sort, Pageable pageable) {
+        Sort resolvedSort = resolveSort(sort);
+        Pageable sortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), resolvedSort);
         Specification<Post> spec = buildPublishedSpec(categorySlug, search);
-        return postRepository.findAll(spec, pageable)
+        return postRepository.findAll(spec, sortedPageable)
                 .map(postMapper::toSummary);
     }
 
@@ -163,6 +175,24 @@ public class PostServiceImpl implements PostService {
     }
 
     // --- helpers ---
+
+    private Sort resolveSort(String sort) {
+        if ("popular".equalsIgnoreCase(sort)) {
+            return Sort.by(Sort.Order.desc("viewCount"), Sort.Order.desc("publishedAt"));
+        }
+        // Default: LATEST
+        return Sort.by(Sort.Order.desc("publishedAt"));
+    }
+
+    private Set<String> normalizeTags(Set<String> raw) {
+        if (raw == null || raw.isEmpty()) {
+            return new LinkedHashSet<>();
+        }
+        return raw.stream()
+                .filter(t -> t != null && !t.isBlank())
+                .map(t -> t.trim().toLowerCase())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
 
     private Post loadPost(Long id) {
         return postRepository.findByIdWithAuthorAndCategory(id)
@@ -199,13 +229,18 @@ public class PostServiceImpl implements PostService {
             predicates.add(cb.equal(root.get("status"), PostStatus.PUBLISHED));
 
             if (categorySlug != null && !categorySlug.isBlank()) {
-                Join<Post, Category> categoryJoin = root.join("category", JoinType.INNER);
+                var categoryJoin = root.join("category", JoinType.INNER);
                 predicates.add(cb.equal(categoryJoin.get("slug"), categorySlug));
             }
 
             if (search != null && !search.isBlank()) {
                 String pattern = "%" + search.toLowerCase() + "%";
-                predicates.add(cb.like(cb.lower(root.get("title")), pattern));
+                var titleLike = cb.like(cb.lower(root.get("title")), pattern);
+                var contentLike = cb.like(cb.lower(root.get("contentMarkdown")), pattern);
+                Join<Post, String> tagJoin = root.join("tags", JoinType.LEFT);
+                var tagLike = cb.like(cb.lower(tagJoin), pattern);
+                query.distinct(true);
+                predicates.add(cb.or(titleLike, contentLike, tagLike));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));
@@ -216,7 +251,7 @@ public class PostServiceImpl implements PostService {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
-            Join<Post, User> authorJoin = root.join("author", JoinType.INNER);
+            var authorJoin = root.join("author", JoinType.INNER);
             predicates.add(cb.equal(authorJoin.get("username"), username));
 
             if (status != null) {

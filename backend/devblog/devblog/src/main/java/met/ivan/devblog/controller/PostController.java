@@ -32,8 +32,9 @@ public class PostController {
     public Page<PostSummaryResponse> listPublished(
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) String sort,
             @PageableDefault(size = 20) Pageable pageable) {
-        return postService.listPublished(category, search, pageable);
+        return postService.listPublished(category, search, sort, pageable);
     }
 
     @GetMapping("/{slug}")

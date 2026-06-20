@@ -51,6 +51,8 @@ const mockPost = {
   createdAt: '2025-01-01T00:00:00Z',
   contentMarkdown: '# Existing content',
   updatedAt: '2025-01-01T00:00:00Z',
+  tags: ['vue', 'typescript'],
+  viewCount: 0,
 }
 
 function createTestRouter() {
@@ -296,6 +298,111 @@ describe('PostEditorView', () => {
       await flushPromises()
 
       expect(postsApi.changeStatus).toHaveBeenCalledWith(5, { status: 'DRAFT' })
+    })
+  })
+
+  describe('tags input', () => {
+    it('renders a tags input field', async () => {
+      const { wrapper } = await mountEditor('/posts/new')
+      const tagsInput = wrapper.find('#tagsInput')
+      expect(tagsInput.exists()).toBe(true)
+    })
+
+    it('serializes comma-separated tags to string[] in create payload', async () => {
+      const { postsApi } = await import('@/api/posts')
+      const createdPost = { ...mockPost, id: 20, status: 'DRAFT' as const }
+      ;(postsApi.create as ReturnType<typeof vi.fn>).mockResolvedValue(createdPost)
+
+      const { wrapper } = await mountEditor('/posts/new')
+
+      await wrapper.find('#title').setValue('Tagged Post')
+      await wrapper.find('#contentMarkdown').setValue('# Content')
+      await wrapper.find('#tagsInput').setValue('vue, typescript, testing')
+
+      const saveDraftBtn = wrapper.findAll('button').find(b => b.text().includes('Save draft'))
+      await saveDraftBtn!.trigger('click')
+      await flushPromises()
+
+      expect(postsApi.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tags: ['vue', 'typescript', 'testing'],
+        }),
+      )
+    })
+
+    it('trims and lowercases tags in create payload', async () => {
+      const { postsApi } = await import('@/api/posts')
+      const createdPost = { ...mockPost, id: 21, status: 'DRAFT' as const }
+      ;(postsApi.create as ReturnType<typeof vi.fn>).mockResolvedValue(createdPost)
+
+      const { wrapper } = await mountEditor('/posts/new')
+
+      await wrapper.find('#title').setValue('Tagged Post')
+      await wrapper.find('#contentMarkdown').setValue('# Content')
+      await wrapper.find('#tagsInput').setValue('  Vue  ,  TypeScript ,REST')
+
+      const saveDraftBtn = wrapper.findAll('button').find(b => b.text().includes('Save draft'))
+      await saveDraftBtn!.trigger('click')
+      await flushPromises()
+
+      expect(postsApi.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tags: ['vue', 'typescript', 'rest'],
+        }),
+      )
+    })
+
+    it('sends empty tags array when tags input is blank', async () => {
+      const { postsApi } = await import('@/api/posts')
+      const createdPost = { ...mockPost, id: 22, status: 'DRAFT' as const }
+      ;(postsApi.create as ReturnType<typeof vi.fn>).mockResolvedValue(createdPost)
+
+      const { wrapper } = await mountEditor('/posts/new')
+
+      await wrapper.find('#title').setValue('No Tags Post')
+      await wrapper.find('#contentMarkdown').setValue('# Content')
+      // Leave tagsInput empty
+
+      const saveDraftBtn = wrapper.findAll('button').find(b => b.text().includes('Save draft'))
+      await saveDraftBtn!.trigger('click')
+      await flushPromises()
+
+      expect(postsApi.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tags: [],
+        }),
+      )
+    })
+
+    it('pre-fills tags from existing post on edit', async () => {
+      const { postsApi } = await import('@/api/posts')
+      ;(postsApi.getMine as ReturnType<typeof vi.fn>).mockResolvedValue(mockPost)
+
+      const { wrapper } = await mountEditor('/posts/5/edit')
+
+      const tagsInput = wrapper.find('#tagsInput')
+      expect((tagsInput.element as HTMLInputElement).value).toBe('vue, typescript')
+    })
+
+    it('serializes tags to string[] in update payload', async () => {
+      const { postsApi } = await import('@/api/posts')
+      ;(postsApi.getMine as ReturnType<typeof vi.fn>).mockResolvedValue(mockPost)
+      ;(postsApi.update as ReturnType<typeof vi.fn>).mockResolvedValue(mockPost)
+
+      const { wrapper } = await mountEditor('/posts/5/edit')
+
+      await wrapper.find('#tagsInput').setValue('spring, security')
+
+      const saveDraftBtn = wrapper.findAll('button').find(b => b.text().includes('Save draft'))
+      await saveDraftBtn!.trigger('click')
+      await flushPromises()
+
+      expect(postsApi.update).toHaveBeenCalledWith(
+        5,
+        expect.objectContaining({
+          tags: ['spring', 'security'],
+        }),
+      )
     })
   })
 })

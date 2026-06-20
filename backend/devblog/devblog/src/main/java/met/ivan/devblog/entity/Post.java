@@ -6,6 +6,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "posts", indexes = {
@@ -48,6 +50,18 @@ public class Post {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
     private Category category;
+
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "post_tags",
+            joinColumns = @JoinColumn(name = "post_id"),
+            indexes = @Index(name = "idx_post_tags_tag", columnList = "tag"))
+    @Column(name = "tag", length = 50)
+    @Builder.Default
+    private Set<String> tags = new LinkedHashSet<>();
+
+    @Column(name = "view_count", nullable = false)
+    @Builder.Default
+    private Long viewCount = 0L;
 
     @Column(name = "published_at")
     private Instant publishedAt;

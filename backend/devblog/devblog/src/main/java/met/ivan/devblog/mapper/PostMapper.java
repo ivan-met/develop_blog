@@ -7,6 +7,9 @@ import met.ivan.devblog.dto.PostSummaryResponse;
 import met.ivan.devblog.entity.Post;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
+
 @Component
 public class PostMapper {
 
@@ -28,7 +31,9 @@ public class PostMapper {
                 post.getPublishedAt(),
                 post.getCreatedAt(),
                 post.getContentMarkdown(),
-                post.getUpdatedAt()
+                post.getUpdatedAt(),
+                copyTags(post),
+                post.getViewCount()
         );
     }
 
@@ -42,8 +47,16 @@ public class PostMapper {
                 categoryMapper.toResponse(post.getCategory()),
                 toAuthorSummary(post),
                 post.getPublishedAt(),
-                post.getCreatedAt()
+                post.getCreatedAt(),
+                copyTags(post),
+                post.getViewCount()
         );
+    }
+
+    private Set<String> copyTags(Post post) {
+        return post.getTags() == null
+                ? new LinkedHashSet<>()
+                : new LinkedHashSet<>(post.getTags());
     }
 
     private AuthorSummary toAuthorSummary(Post post) {
