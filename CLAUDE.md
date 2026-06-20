@@ -58,17 +58,18 @@ develop_blog/
 │       │   └── util/               # Helpers (e.g. slug generation)
 │       ├── main/resources/application.yaml
 │       └── test/                   # Unit, slice, and integration tests
-└── frontend/                       # Vue 3 + TypeScript SPA
-    ├── package.json
-    ├── vite.config.ts              # Vite config + /api dev proxy
-    └── src/
-        ├── api/                    # Axios client, typed endpoints (auth, posts, …)
-        ├── components/             # Reusable UI components
-        ├── composables/           # Reusable composition functions
-        ├── router/                 # Vue Router + route guards
-        ├── stores/                 # Pinia stores (auth, …)
-        ├── views/                  # Page-level components (incl. admin/)
-        └── test/                   # Vitest tests
+├── frontend/                       # Vue 3 + TypeScript SPA
+│   ├── package.json
+│   ├── vite.config.ts              # Vite config + /api dev proxy
+│   └── src/
+│       ├── api/                    # Axios client, typed endpoints (auth, posts, …)
+│       ├── components/             # Reusable UI components
+│       ├── composables/           # Reusable composition functions
+│       ├── router/                 # Vue Router + route guards
+│       ├── stores/                 # Pinia stores (auth, …)
+│       ├── views/                  # Page-level components (incl. admin/)
+│       └── test/                   # Vitest tests
+└── docs/                           # Plans (docs/plans) + prompt logs (docs/prompt_logs)
 ```
 
 > Note: the Maven project currently lives at the nested path
@@ -94,8 +95,12 @@ Both halves are implemented and functional:
 - **Backend** — Spring Boot 4 REST API (Java 21, package `met.ivan.devblog`) with Spring
   Security + JWT auth (access/refresh tokens), Spring Data JPA over SQLite, BCrypt
   password hashing, CORS for the SPA, and a global exception handler. Domains: users,
-  roles, posts (Markdown, draft/published lifecycle, slugs), and categories. On startup
-  `DataInitializer` seeds roles, a default admin/user, and starter categories.
+  roles, posts (Markdown, draft/published lifecycle, slugs, free-form tags, and a
+  `viewCount` popularity counter), and categories. Public post listing supports filtering
+  by category, search across title/content/tags, and `sort=latest|popular`; reading a
+  post increments its view count. On startup `DataInitializer` seeds roles, a default
+  admin/user, starter categories, and starter posts (authored by the default user) for
+  content discovery.
 - **Frontend** — Vue 3 + TypeScript SPA (Pinia, Vue Router with auth guards, typed Axios
   client) covering auth, profile, post authoring, public browsing, and admin views.
 - **Config/secrets** — `application.yaml` exposes env-overridable settings (`JWT_SECRET`,
