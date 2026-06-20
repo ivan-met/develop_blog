@@ -49,7 +49,7 @@ develop_blog/
 │       │   ├── config/             # Security, app properties, data seeding
 │       │   ├── controller/         # REST controllers + global exception handler
 │       │   ├── dto/                # Request/response DTOs (API boundary)
-│       │   ├── entity/             # JPA entities (User, Role, Post, Category, RefreshToken)
+│       │   ├── entity/             # JPA entities (User, Role, Post, Category, RefreshToken, Comment, PostLike, PostBookmark)
 │       │   ├── exception/          # Domain exceptions
 │       │   ├── mapper/             # Entity ⇄ DTO mappers
 │       │   ├── repository/         # Spring Data JPA repositories
@@ -98,9 +98,14 @@ Both halves are implemented and functional:
   roles, posts (Markdown, draft/published lifecycle, slugs, free-form tags, and a
   `viewCount` popularity counter), and categories. Public post listing supports filtering
   by category, search across title/content/tags, and `sort=latest|popular`; reading a
-  post increments its view count. On startup `DataInitializer` seeds roles, a default
-  admin/user, starter categories, and starter posts (authored by the default user) for
-  content discovery.
+  post increments its view count. Engagement features layer on top: flat comments on
+  published posts (`/api/posts/{slug}/comments`, `/api/comments/{id}`), idempotent likes
+  and private bookmarks (`/api/posts/{slug}/like|bookmark`,
+  `/api/users/me/bookmarks`), and public author profiles (`/api/authors/{username}` and
+  `/{username}/posts`). Post payloads are enriched with `likeCount` (and `liked`/
+  `bookmarked` for the authenticated caller). On startup `DataInitializer` seeds roles, a
+  default admin/user, starter categories, starter posts (authored by the default user),
+  and starter comments/likes for content discovery.
 - **Frontend** — Vue 3 + TypeScript SPA (Pinia, Vue Router with auth guards, typed Axios
   client) covering auth, profile, post authoring, public browsing, and admin views.
 - **Config/secrets** — `application.yaml` exposes env-overridable settings (`JWT_SECRET`,

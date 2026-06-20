@@ -2,7 +2,8 @@
 
 The Vue 3 + TypeScript single-page app for the Developer Blog Platform. It talks to the
 Spring Boot REST API over `/api`, handling authentication, Markdown post authoring, public
-browsing, and administration.
+browsing, reader engagement (comments, likes, bookmarks, author profiles), and
+administration.
 
 > This is the frontend half of the project. See the [root README](../README.md) for the
 > backend, full REST API reference, and overall architecture.
@@ -72,10 +73,14 @@ frontend/
     │   ├── http.ts         #   Axios instance + JWT request/refresh interceptors
     │   ├── types.ts        #   Shared request/response types (API contract)
     │   ├── auth.ts         #   /api/auth  (register, login, refresh, logout)
-    │   ├── users.ts        #   /api/users (me, profile, password)
+    │   ├── users.ts        #   /api/users (me, profile, password, bookmarks)
     │   ├── posts.ts        #   /api/posts (public + authoring)
-    │   └── categories.ts   #   /api/categories
-    ├── components/         # Reusable UI (NavBar, PostCard, MarkdownEditor/Preview, …)
+    │   ├── categories.ts   #   /api/categories
+    │   ├── comments.ts     #   /api/posts/{slug}/comments, /api/comments/{id}
+    │   ├── engagement.ts   #   like / unlike / bookmark toggles
+    │   └── authors.ts      #   /api/authors/{username} (profile + posts)
+    ├── components/         # Reusable UI (NavBar, PostCard, LikeButton, BookmarkButton,
+    │                       #   CommentList/Form, AuthorByline, MarkdownEditor/Preview, …)
     ├── composables/        # Reusable composition functions (e.g. useFormValidation)
     ├── router/             # Vue Router routes + global navigation guards
     ├── stores/             # Pinia stores (auth)
@@ -101,6 +106,8 @@ global `beforeEach` guard:
 | `/profile` | `profile` | Authenticated |
 | `/posts/new`, `/posts/:id/edit` | `post-new`, `post-edit` | Authenticated — post editor |
 | `/me/posts` | `my-posts` | Authenticated — the user's own posts |
+| `/me/bookmarks` | `bookmarks` | Authenticated — the user's bookmarked posts |
+| `/authors/:username` | `author-profile` | Public — author profile + their published posts |
 | `/admin/users` | `admin-users` | Admin only |
 | `/admin/categories` | `admin-categories` | Admin only |
 | `*` | — | Fallback → redirects to `/` |
