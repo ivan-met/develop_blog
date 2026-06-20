@@ -1,0 +1,32 @@
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Environment / secrets
+.env
+.env.local
+*.local
+
+# Build output
+target/
+build/
+dist/
+
+# SQLite (runtime database)
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
