@@ -39,9 +39,11 @@ communities.
 - **User accounts** — registration, login, JWT-based sessions with refresh-token rotation,
   profile editing, and password change.
 - **Blog post authoring** — create, edit, and delete posts written in Markdown, with
-  draft/published lifecycle management and auto-generated URL slugs.
-- **Public discovery** — browse and read published posts, filter by category, and
-  full-text-style search by keyword, with pagination.
+  draft/published lifecycle management, free-form tags, and auto-generated URL slugs.
+- **Public discovery** — browse and read published posts, filter by technology/category,
+  search across title, content, and tags, sort by **Latest** or **Most Popular**
+  (view-count based), and page through results. Each public read increments the post's
+  view count.
 - **Categories** — posts are organized under technology categories (Java, Spring, Vue,
   DevOps, …), managed by administrators.
 - **Role-based administration** — admins manage users (roles, active status) and
@@ -123,17 +125,21 @@ develop_blog/
 │       ├── main/resources/application.yaml
 │       └── test/                   # Unit, slice, and integration tests
 │
-└── frontend/                       # Vue 3 + TypeScript SPA
-    ├── package.json
-    ├── vite.config.ts              # Vite config + /api dev proxy
-    └── src/
-        ├── api/                    # Axios client, typed endpoints (auth, posts, …)
-        ├── components/             # Reusable UI components
-        ├── composables/            # Reusable composition functions
-        ├── router/                 # Vue Router + route guards
-        ├── stores/                 # Pinia stores (auth, …)
-        ├── views/                  # Page-level components (incl. admin/)
-        └── test/                   # Vitest tests
+├── frontend/                       # Vue 3 + TypeScript SPA
+│   ├── package.json
+│   ├── vite.config.ts              # Vite config + /api dev proxy
+│   └── src/
+│       ├── api/                    # Axios client, typed endpoints (auth, posts, …)
+│       ├── components/             # Reusable UI components
+│       ├── composables/            # Reusable composition functions
+│       ├── router/                 # Vue Router + route guards
+│       ├── stores/                 # Pinia stores (auth, …)
+│       ├── views/                  # Page-level components (incl. admin/)
+│       └── test/                   # Vitest tests
+│
+└── docs/                           # Project docs
+    ├── plans/                      # Feature implementation plans
+    └── prompt_logs/                # Logged user prompts (UserPromptSubmit hook)
 ```
 
 > Note: the Maven project lives at the nested path `backend/devblog/devblog/`.
@@ -223,6 +229,10 @@ On startup `DataInitializer` ensures the following exist (all idempotent):
 - **Admin user** (holds both `ADMIN` and `USER` roles) — defaults `admin` / `Admin@1234`.
 - **Regular user** (holds `USER`) — defaults `user` / `User@1234`.
 - **Starter categories:** Java, Spring, Vue, DevOps (only seeded when no categories exist).
+- **Starter posts:** a set of published posts authored by the default regular user, spread
+  across the seeded categories with varied tags, staggered publish dates, and view counts
+  so discovery (Latest / Most Popular, search, category filter) has realistic data (only
+  seeded when no posts exist).
 
 > ⚠️ The default credentials are for local development only. Override the `SEED_*`
 > variables (and `JWT_SECRET`) before deploying anywhere shared.
@@ -256,8 +266,8 @@ Base path: `/api`. All request/response bodies are JSON. Protected endpoints exp
 
 | Method | Path | Auth | Description |
 | --- | --- | --- | --- |
-| `GET` | `/` | Public | List published posts. Query: `category`, `search`, pagination. |
-| `GET` | `/{slug}` | Public | Get a published post by slug. |
+| `GET` | `/` | Public | List published posts. Query: `category`, `search` (title/content/tags), `sort` (`latest` \| `popular`), pagination. |
+| `GET` | `/{slug}` | Public | Get a published post by slug (increments its view count). |
 | `GET` | `/mine` | Authenticated | List the caller's own posts. Query: `status`, pagination. |
 | `GET` | `/mine/{id}` | Authenticated | Get one of the caller's own posts by id. |
 | `POST` | `/` | Authenticated | Create a post. `201 Created`. |
@@ -302,9 +312,10 @@ handler, with appropriate HTTP status codes (`400`, `401`, `403`, `404`, `409`, 
 - **RefreshToken** — persisted refresh tokens supporting rotation and logout.
 - **Category** — name, unique slug, and description; groups posts.
 - **Post** — title, unique slug, Markdown content, optional excerpt, `status`
-  (`DRAFT` / `PUBLISHED` via `PostStatus`), author (`User`), optional category,
-  `publishedAt`, and audit timestamps (`createdAt`, `updatedAt`) with optimistic-locking
-  `version`. Indexed on slug, status, and author.
+  (`DRAFT` / `PUBLISHED` via `PostStatus`), author (`User`), optional category, a set of
+  free-form `tags` (`@ElementCollection`, normalized lowercase), a `viewCount` popularity
+  counter, `publishedAt`, and audit timestamps (`createdAt`, `updatedAt`) with
+  optimistic-locking `version`. Indexed on slug, status, author, and tag.
 
 ---
 
