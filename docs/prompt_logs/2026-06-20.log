@@ -823,3 +823,1862 @@ update claude.md and readme files
 [2026-06-20T17:17:10] (session 43ef3b78)
 checkout new branch and commit push it
 
+[2026-06-20T17:18:38] (session 83a7eb29)
+create plan for feature:
+
+[2026-06-20T17:21:01] (session 83a7eb29)
+create plan for feature:
+Engagement Features
+•    Comment on blog posts
+•    Like or bookmark articles
+•    View author information and published posts
+
+Delegate frontend and backend tasks to sutable agents. Consider test strategy. Ask as many question as needed. When plan is ready save it in project directory docs/plans.
+
+[2026-06-20T17:22:45] (session 83a7eb29)
+<task-notification>
+<task-id>aa1b0abdceccb6c18</task-id>
+<tool-use-id>toolu_011LkuNMdwzufLnrPkL5iwZW</tool-use-id>
+<output-file>C:\Users\ivan_\AppData\Local\Temp\claude\C--projects-develop-blog\83a7eb29-c46b-4633-bdce-6a2e065c10e5\tasks\aa1b0abdceccb6c18.output</output-file>
+<status>completed</status>
+<summary>Agent "Explore frontend structure" came to rest</summary>
+<note>A task-notification fires each time this agent comes to rest with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Excellent! Now I have a comprehensive understanding of the codebase. Let me create a thorough report.
+
+## Comprehensive Vue 3 + TypeScript Frontend Analysis
+
+I've completed a thorough exploration of your Developer Blog Platform frontend. Here's a detailed breakdown of the existing patterns to guide your engagement features:
+
+---
+
+### 1. API CLIENT SETUP (src/api/)
+
+**HTTP Client: `/src/api/http.ts`**
+- **Base URL**: `/api` (Vite proxy handles routing to `http://localhost:8080`)
+- **Axios Instance**: Configured with JSON content-type headers
+- **Request Interceptor**: Automatically injects `Authorization: Bearer &lt;token&gt;` from auth store
+- **Response Interceptor** (Smart Token Refresh):
+  - On 401: Initiates one refresh attempt using stored `refreshToken`
+  - **Queue Pattern**: Concurrent requests during refresh are queued and retried with new token
+  - **Circular Dependency Fix**: Lazy imports auth store to avoid circular dependencies
+  - Failed refresh triggers auto-logout and clears stored tokens
+  - Auth endpoints exempt from retry logic to prevent infinite loops
+
+**Type Definitions: `/src/api/types.ts`**
+- `PostResponse` / `PostSummaryResponse` - full/summary posts with author, category, view count, tags
+- `UserResponse` - user profile with username, email, displayName, bio, avatarUrl, roles, active status
+- `AuthResponse` - login/register returns access/refresh tokens + user
+- `Page&lt;T&gt;` - pagination: `{ content: T[], totalElements, totalPages, number, size, first, last }`
+- `ApiError` - standardized error with timestamp, status, message, fieldErrors
+
+**API Endpoint Modules**:
+- **`/src/api/auth.ts`**: `register()`, `login()`, `refresh()`, `logout()`
+- **`/src/api/posts.ts`**:
+  - Public: `listPublished({ category?, search?, sort: 'latest'|'popular', page?, size? })`, `getBySlug(slug)`
+  - Authenticated: `listMine({ status?, page?, size? })`, `getMine(id)`, `create()`, `update()`, `changeStatus()`, `remove()`
+- **`/src/api/users.ts`**:
+  - Profile: `getMe()`, `updateMe({ displayName?, bio?, avatarUrl?, email? })`, `changePassword()`
+  - Admin: `listUsers({ page?, size?, search? })`, `getUser(id)`, `updateRoles(id, { roles })`, `updateStatus(id, { active })`
+- **`/src/api/categories.ts`**: `list()`, `getBySlug(slug)`, `create()`, `update()`, `remove()`
+
+---
+
+### 2. STATE MANAGEMENT (src/stores/)
+
+**Auth Store: `/src/stores/auth.ts`** (Pinia)
+```typescript
+// State
+accessToken: string | null          // Synced to localStorage
+refreshToken: string | null         // Synced to localStorage
+currentUser: UserResponse | null
+loading: boolean
+
+// Computed getters
+isAuthenticated: boolean            // !!accessToken
+isAdmin: boolean                    // currentUser?.roles.includes('ADMIN')
+isUser: boolean                     // currentUser?.roles.includes('USER')
+
+// Actions
+register(data: RegisterRequest): Promise&lt;void&gt;
+login(data: LoginRequest): Promise&lt;void&gt;
+logout(): Promise&lt;void&gt;              // Best-effort async API call, clears state immediately
+refresh(): Promise&lt;string&gt;           // Returns new access token
+loadMe(): Promise&lt;void&gt;              // Fetches currentUser if authenticated
+```
+
+**Token Persistence**:
+- Keys: `'devblog_access_token'`, `'devblog_refresh_token'`
+- On init: Rehydrates from localStorage and calls `loadMe()` if token exists
+- This allows page refresh to restore authenticated state
+
+---
+
+### 3. VIEWS (src/views/)
+
+**PostDetailView.vue** (`/posts/:slug`)
+- Fetches post via `postsApi.getBySlug(slug)`
+- Renders markdown content via `MarkdownPreview` component
+- **Loading/Error/NotFound States**: Spinner, 404 message, error alert
+- **Edit Button Logic**: Shows for post author OR admins (checks `auth.currentUser?.id === post.author.id`)
+- **Layout**: Hero title with category chip, author avatar/name, date, divider, markdown body, back link
+- **Date Formatting**: Uses published or created date with locale formatter
+
+**PostsListView.vue** (public, `/`)
+- Grid of `PostCard` components (3 columns on desktop)
+- **Filtering**:
+  - Search (debounced 350ms)
+  - Category filter (dropdown of categories fetched on mount)
+  - Sort: "latest" or "most popular"
+- **Pagination**: Page size 12, displays total elements &amp; page count
+- **Loading State**: Skeleton cards grid
+- **Tag Click**: Emitted from PostCard, triggers search query update
+- Fetches posts via `postsApi.listPublished()` with filter params
+
+**MyPostsView.vue** (`/me/posts`, protected)
+- Table of user's posts with status filter tabs (ALL/DRAFT/PUBLISHED)
+- **Per-post Actions**: Edit, Publish/Unpublish toggle, Delete with confirmation
+- **Per-row State**: `actioning[postId]` tracks loading during mutations
+- In-place updates after status/delete operations
+
+**ProfileView.vue** (`/profile`, protected)
+- **Read-only Info**: Username, avatar initial, roles badges (ADMIN/USER color-coded), join date
+- **Profile Form**: Email, displayName, bio, avatarUrl with validation
+- **Password Form**: Current, new, confirm with match validation
+- **Form Validation**: Uses `useFormValidation` composable with server error mapping
+- **Success/Error Messages**: Alert components displayed after actions
+
+**Admin Views**:
+- **UsersView.vue** (`/admin/users`): Paginated table with search, role toggles (ADMIN/USER buttons), activate/deactivate
+- **CategoriesView.vue** (`/admin/categories`): Create/edit panel, delete confirmation
+
+---
+
+### 4. COMPONENTS (src/components/)
+
+**Reusable Components**:
+
+| Component | Purpose | Key Props/Events |
+|-----------|---------|------------------|
+| `PostCard.vue` | Grid card for post summary | `post: PostSummaryResponse`, `showStatus?`, emits `@tagClick` |
+| `MarkdownPreview.vue` | Renders markdown to HTML safely | `content: string` (uses markdown-it + DOMPurify) |
+| `AppButton.vue` | Styled button with loading state | `variant: 'primary'/'secondary'/'danger'/'ghost'`, `loading?`, `fullWidth?`, `disabled?` |
+| `AlertMessage.vue` | Colored alert boxes | `type: 'error'/'success'/'info'`, `message: string` |
+| `FormField.vue` | Label + error/hint wrapper | `id`, `label`, `error?`, `hint?` |
+| `AppInput.vue` | Styled input field | `v-model`, `type`, `placeholder`, `hasError?`, `disabled?` |
+| `StatusBadge.vue` | Post status indicator | `status: PostStatus` (shows "published" or "draft") |
+| `NavBar.vue` | Header with auth-aware nav links | Responsive mobile menu, logout handler |
+| `MarkdownEditor.vue` | Rich markdown editor (for post creation) | (not examined in detail) |
+| `CategorySelect.vue` | Dropdown for category selection | (not examined in detail) |
+
+**Styling Patterns**:
+- All components use **inline styles** with CSS variables for colors (no Tailwind classes in components)
+- Color palette from `/src/style.css`:
+  - `#0D1117` (ink background)
+  - `#161B22` (surface)
+  - `#30363D` (borders)
+  - `#E6A817` (amber accent)
+  - `#E6EDF3` (light text)
+  - `#F85149` (danger), `#3FB950` (success)
+- Fonts: `JetBrains Mono` (display/mono), `Inter` (body)
+
+---
+
+### 5. ROUTER (src/router/index.ts)
+
+**Route Guards**:
+```typescript
+Meta flags: { public?, requiresAuth?, requiresAdmin?, redirectIfAuth? }
+
+// Global beforeEach guard logic:
+- redirectIfAuth: Redirects authenticated users from /login, /register to /
+- requiresAuth: Redirects unauthenticated to /login with redirect query param
+- requiresAdmin: Calls loadMe() if token exists but user not loaded, then checks isAdmin
+```
+
+**Public Routes**: `/`, `/login`, `/register`, `/posts/:slug`
+
+**Protected Routes**: `/profile`, `/posts/new`, `/posts/:id/edit`, `/me/posts`
+
+**Admin Routes**: `/admin/users`, `/admin/categories`
+
+---
+
+### 6. COMPOSABLES (src/composables/)
+
+**`useFormValidation.ts`**:
+```typescript
+function useFormValidation&lt;T extends Record&lt;string, string&gt;&gt;(fields: T) {
+  return {
+    errors: Ref&lt;Partial&lt;Record&lt;keyof T, string&gt;&gt;&gt;,
+    validate(rules: { [K in keyof T]?: ValidationRule&lt;string&gt;[] }): boolean,
+    setFieldError(field, message | null): void,
+    clearErrors(): void,
+    setServerErrors(fieldErrors: Record&lt;string, string&gt;): void
+  }
+}
+
+// Built-in rules: required, minLength, maxLength, email, matches, noSpaces
+```
+
+Used in ProfileView and auth forms to validate and display field-level errors. Can map backend `fieldErrors` object directly.
+
+---
+
+### 7. TESTING (src/test/)
+
+**Setup: `/src/test/setup.ts`**
+- Mocks localStorage with Vitest
+- Clear mocks before each test
+- JSDOM environment configured in vite.config.ts
+
+**Test Patterns**:
+
+| File | Example |
+|------|---------|
+| **API Tests** (`posts.test.ts`) | Mock http client, verify endpoints called with correct params, assert response shape |
+| **Store Tests** (`auth.test.ts`) | Mock APIs, test state mutations, verify localStorage calls, test computed getters |
+| **Component Tests** (`PostCard.test.ts`) | Mount with vue-router, test emit events, stub child components, assert DOM content |
+
+**Mock Strategy**:
+```typescript
+vi.mock('@/api/http', () =&gt; ({
+  default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() }
+}))
+// Then: (http.get as ReturnType&lt;typeof vi.fn&gt;).mockResolvedValue({ data: ... })
+```
+
+**Representative Example** (PostCard tags):
+```typescript
+it('emits tagClick with the correct tag when clicked', async () =&gt; {
+  const wrapper = await mountCard()
+  const tagButtons = wrapper.findAll('button[aria-label^="Search for tag"]')
+  await tagButtons[0].trigger('click')
+  expect(wrapper.emitted('tagClick')![0]).toEqual(['vue'])
+})
+```
+
+---
+
+### 8. STYLING &amp; DESIGN TOKENS
+
+**Tailwind Setup: `/src/style.css`**
+```css
+@theme {
+  --color-ink: #0D1117
+  --color-surface: #161B22
+  --color-border: #30363D
+  --color-amber: #E6A817
+  --font-display: "JetBrains Mono"
+}
+```
+
+**Component Design**:
+- Dark theme (GitHub-inspired "Midnight Ink" palette)
+- Monospace headings for a developer-facing aesthetic
+- Inline styles heavily used for dynamic theming (e.g., hover colors)
+- Consistent spacing (px-3/4, py-2/3, gap-2/3)
+- Subtle borders with `1px solid #30363D`
+- State indicators via color: amber (primary), green (success), red (danger), muted gray (disabled)
+
+---
+
+### 9. INTEGRATION PATTERNS
+
+**How Data Flows**:
+1. **Component** calls API via injected client module (e.g., `postsApi.listPublished()`)
+2. **HTTP Interceptors** attach auth token automatically
+3. **Store** tracks global state (auth, current user)
+4. **Router Guards** enforce access control before rendering views
+5. **Composables** encapsulate form logic and validation
+
+**Error Handling**:
+- API errors caught with `axios.isAxiosError()` check
+- Backend field errors mapped via `ApiError.fieldErrors` to form validation
+- User-facing messages prioritize backend message or fallback to generic error
+- Loading states prevent accidental duplicate submissions
+
+---
+
+## Recommendations for Your 3 Engagement Features
+
+### 1. **Comments on Blog Posts**
+- **API Module**: Create `/src/api/comments.ts` with methods like:
+  - `createComment(postId, { content })`: POST `/posts/:id/comments`
+  - `listComments(postId, { page?, size? })`: GET `/posts/:id/comments` (paginated)
+  - `deleteComment(commentId)`: DELETE `/comments/:id` (if user is author/admin)
+- **Component**: `CommentForm.vue` (with validation) + `CommentThread.vue` (list/delete)
+- **PostDetailView Update**: Fetch comments on mount, add comment form below markdown
+- **Store**: Optional - could cache comments in Pinia if needed, or just fetch per-view
+
+### 2. **Like/Bookmark Articles**
+- **API Module**: `/src/api/interactions.ts` with:
+  - `likePost(postId)`: POST `/posts/:id/like`
+  - `unlikePost(postId)`: DELETE `/posts/:id/like`
+  - `bookmarkPost(postId)`: POST `/posts/:id/bookmark`
+  - `removeBookmark(postId)`: DELETE `/posts/:id/bookmark`
+  - `getMyLikedPosts({ page?, size? })`: GET `/me/likes`
+  - `getMyBookmarks({ page?, size? })`: GET `/me/bookmarks`
+- **Components**: Like/bookmark buttons (heart/star icons) with toggle state
+- **PostDetailView/PostCard**: Add buttons to header, bind click handlers, optimistic UI updates
+- **Store**: Track liked/bookmarked post IDs in auth store for quick access checks
+
+### 3. **View Author Info &amp; Published Posts**
+- **API Module**: Extend `/src/api/users.ts` with:
+  - `getUserPublic(userId)`: GET `/users/:id` (public profile without email/roles)
+  - `getUserPosts(userId, { page?, size? })`: GET `/users/:id/posts`
+- **New View**: `AuthorProfileView.vue` (`/authors/:username` or `/users/:id`)
+  - Display author bio, avatar, stats (post count, follower count if applicable)
+  - Paginated grid of their published posts
+- **Component**: `AuthorCard.vue` (reusable mini profile in post header)
+- **PostDetailView**: Replace static author name with RouterLink to author profile
+
+---
+
+### File Paths Reference
+
+**Core Structure**:
+- `/src/api/http.ts` - Axios setup + interceptors
+- `/src/api/types.ts` - All TypeScript interfaces
+- `/src/stores/auth.ts` - Pinia auth store
+- `/src/router/index.ts` - Route definitions + guards
+- `/src/composables/useFormValidation.ts` - Form validation utility
+
+**Views** (all in `/src/views/`):
+- `PostsListView.vue` - Public post grid
+- `PostDetailView.vue` - Single post with markdown
+- `MyPostsView.vue` - Authenticated user's posts
+- `ProfileView.vue` - Current user profile edit
+
+**Components** (all in `/src/components/`):
+- `PostCard.vue` - Reusable post card
+- `MarkdownPreview.vue` - Markdown renderer
+- `AppButton.vue`, `AppInput.vue` - Form primitives
+- `AlertMessage.vue` - Error/success messages
+- `NavBar.vue` - Header
+
+**Tests** (mirrored in `/src/test/`):
+- `test/api/posts.test.ts` - API endpoint tests
+- `test/stores/auth.test.ts` - Store logic tests
+- `test/components/PostCard.test.ts` - Component tests
+- `test/setup.ts` - Vitest configuration
+
+---
+
+This architecture is clean, testable, and follows Vue 3 composition API conventions. Your engagement features should follow the same patterns: typed API modules → Pinia store mutations → component integration with form validation and error handling.</result>
+<usage><subagent_tokens>64009</subagent_tokens><tool_uses>36</tool_uses><duration_ms>83155</duration_ms></usage>
+</task-notification>
+
+[2026-06-20T17:23:02] (session 83a7eb29)
+<task-notification>
+<task-id>ac27a14a06e5e33b7</task-id>
+<tool-use-id>toolu_01SD3DSJknvkawTTBtgFtDL3</tool-use-id>
+<output-file>C:\Users\ivan_\AppData\Local\Temp\claude\C--projects-develop-blog\83a7eb29-c46b-4633-bdce-6a2e065c10e5\tasks\ac27a14a06e5e33b7.output</output-file>
+<status>completed</status>
+<summary>Agent "Explore backend domain &amp; API" came to rest</summary>
+<note>A task-notification fires each time this agent comes to rest with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Perfect! Now I have a comprehensive view of the backend. Let me create a detailed report with all the information you requested.
+
+## Comprehensive Spring Boot Backend Architecture Report
+
+Based on my thorough exploration of the Developer Blog Platform backend, here's the complete architectural overview:
+
+---
+
+### 1. ENTITIES
+
+**Location:** `C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\entity\`
+
+#### **User.java**
+- **ID Strategy:** `@GeneratedValue(strategy = GenerationType.IDENTITY)`
+- **Fields:**
+  - `Long id` (primary key)
+  - `String username` (unique, max 50)
+  - `String email` (unique, max 100)
+  - `String passwordHash` (not null)
+  - `String displayName` (max 100)
+  - `String bio` (max 500)
+  - `String avatarUrl` (max 255)
+  - `boolean active` (default: true)
+  - `Instant createdAt` (@CreationTimestamp, immutable)
+  - `Instant updatedAt` (@UpdateTimestamp)
+  - `Long version` (@Version for optimistic locking)
+- **Relationships:** `@ManyToMany Set&lt;Role&gt; roles` (LAZY, join table: user_roles)
+- **Auditing:** CreationTimestamp, UpdateTimestamp
+- **Indexes:** idx_users_username, idx_users_email
+
+#### **Post.java**
+- **ID Strategy:** `@GeneratedValue(strategy = GenerationType.IDENTITY)`
+- **Fields:**
+  - `Long id` (primary key)
+  - `String title` (not null, max 255)
+  - `String slug` (unique, max 300) — URL-safe identifier
+  - `String contentMarkdown` (not null, TEXT)
+  - `String excerpt` (max 300)
+  - `PostStatus status` (DRAFT/PUBLISHED, default: DRAFT)
+  - `Long viewCount` (default: 0L) — **implemented as simple Long field, incremented via @Modifying @Query in repository**
+  - `Instant publishedAt` (null until published)
+  - `Instant createdAt` (@CreationTimestamp)
+  - `Instant updatedAt` (@UpdateTimestamp)
+  - `Long version` (@Version)
+  - `Set&lt;String&gt; tags` (@ElementCollection with CollectionTable)
+- **Relationships:**
+  - `@ManyToOne(LAZY) User author` (required, join column: author_id)
+  - `@ManyToOne(LAZY) Category category` (optional)
+- **Auditing:** CreationTimestamp, UpdateTimestamp
+- **Indexes:** idx_posts_slug, idx_posts_status, idx_posts_author_id, idx_post_tags_tag
+
+#### **Category.java**
+- **ID Strategy:** `@GeneratedValue(strategy = GenerationType.IDENTITY)`
+- **Fields:**
+  - `Long id`
+  - `String name` (unique, max 100)
+  - `String slug` (unique, max 120) — generated from name
+  - `String description` (TEXT)
+  - `Instant createdAt` (@CreationTimestamp)
+  - `Instant updatedAt` (@UpdateTimestamp)
+- **Auditing:** CreationTimestamp, UpdateTimestamp
+- **Indexes:** idx_categories_slug
+
+#### **RefreshToken.java**
+- **ID Strategy:** `@GeneratedValue(strategy = GenerationType.IDENTITY)`
+- **Fields:**
+  - `Long id`
+  - `String token` (unique, max 512)
+  - `Instant expiresAt` (not null)
+  - `boolean revoked` (default: false) — for token rotation
+- **Relationships:** `@ManyToOne(LAZY) User user` (required)
+- **Indexes:** idx_refresh_token_token, idx_refresh_token_user
+
+#### **Role.java**
+- **ID Strategy:** `@GeneratedValue(strategy = GenerationType.IDENTITY)`
+- **Fields:**
+  - `Long id`
+  - `RoleName name` (enum, unique, ADMIN/USER)
+
+---
+
+### 2. DTOs
+
+**Location:** `C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\dto\`
+
+#### **Create/Update Post DTOs**
+- **CreatePostRequest:** title, contentMarkdown, excerpt, categoryId, status (optional), tags (Set, max 10 tags)
+- **UpdatePostRequest:** title, contentMarkdown, excerpt, categoryId, tags (no status field—use separate endpoint)
+- **UpdatePostStatusRequest:** status field (for changing DRAFT↔PUBLISHED)
+
+#### **Response DTOs**
+- **PostResponse:** Full DTO with contentMarkdown included
+  - Fields: id, slug, title, excerpt, status, category (CategoryResponse), author (AuthorSummary), publishedAt, createdAt, contentMarkdown, updatedAt, tags, viewCount
+  - Uses `@JsonInclude(JsonInclude.Include.NON_NULL)` for optional fields
+  
+- **PostSummaryResponse:** For list views (excludes contentMarkdown)
+  - Fields: id, slug, title, excerpt, status, category, author, publishedAt, createdAt, tags, viewCount
+
+- **AuthorSummary:** id, username, displayName (minimal author info in post responses)
+
+- **CategoryResponse:** id, name, slug, description
+
+- **UserResponse:** id, username, email, displayName, bio, avatarUrl, roles (List&lt;String&gt;), active, createdAt
+
+#### **Pagination**
+- Uses Spring Data `Page&lt;PostSummaryResponse&gt;` for list endpoints
+- `@PageableDefault(size = 20)` annotation on pageable parameters
+- Clients pass `?page=0&amp;size=20&amp;sort=field,desc`
+
+---
+
+### 3. CONTROLLERS
+
+**Location:** `C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\controller\`
+
+#### **PostController** (`/api/posts`)
+```
+GET    /api/posts
+       Params: ?category=slug, ?search=query, ?sort=latest|popular, page/size
+       Public endpoint, returns Page&lt;PostSummaryResponse&gt;
+
+GET    /api/posts/{slug}
+       Public, returns PostResponse + increments viewCount
+       Throws ResourceNotFoundException if not published
+
+GET    /api/posts/mine
+       Authenticated, Params: ?status=DRAFT|PUBLISHED
+       Returns user's own posts (all statuses)
+
+GET    /api/posts/mine/{id}
+       Authenticated, owner or admin only
+       Returns full PostResponse
+
+POST   /api/posts
+       Authenticated, @RequestBody CreatePostRequest
+       Returns PostResponse with created post
+
+PUT    /api/posts/{id}
+       Authenticated, owner or admin only
+       Updates post (slug remains stable)
+
+PUT    /api/posts/{id}/status
+       Authenticated, owner or admin only
+       Changes DRAFT↔PUBLISHED, sets publishedAt when publishing
+
+DELETE /api/posts/{id}
+       Authenticated, owner or admin only
+       Hard delete
+```
+
+**Auth Pattern:** `@AuthenticationPrincipal UserDetails principal` — principal.getUsername() is used to resolve the current user
+
+#### **UserController** (`/api/users`)
+```
+GET    /api/users/me
+       Authenticated, returns UserResponse
+
+PUT    /api/users/me
+       Authenticated, @RequestBody UpdateProfileRequest
+       Updates email, displayName, bio, avatarUrl
+
+PUT    /api/users/me/password
+       Authenticated, @RequestBody ChangePasswordRequest
+       Validates current password, sets new password
+```
+
+#### **AuthController** (`/api/auth`)
+```
+POST   /api/auth/register
+       Public, @RequestBody RegisterRequest
+       Returns AuthResponse (accessToken, refreshToken, user)
+
+POST   /api/auth/login
+       Public, @RequestBody LoginRequest (usernameOrEmail, password)
+       Returns AuthResponse
+
+POST   /api/auth/refresh
+       Public, @RequestBody RefreshTokenRequest
+       Implements token rotation (revokes old, issues new)
+       Returns TokenRefreshResponse
+
+POST   /api/auth/logout
+       Public, @RequestBody RefreshTokenRequest
+       Revokes refresh token
+```
+
+#### **CategoryController** (`/api/categories`)
+```
+GET    /api/categories
+       Public, returns List&lt;CategoryResponse&gt;
+
+GET    /api/categories/{slug}
+       Public, returns CategoryResponse
+```
+
+---
+
+### 4. SERVICES
+
+**Location:** `C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\service\`
+
+#### **PostService Interface + PostServiceImpl**
+- **create(username, CreatePostRequest)** — Admins cannot author posts; creates unique slug; sets publishedAt if status=PUBLISHED
+- **update(id, principal, UpdatePostRequest)** — Owner/admin only; slug remains stable
+- **changeStatus(id, principal, UpdatePostStatusRequest)** — Owner/admin only; sets publishedAt on first publish
+- **delete(id, principal)** — Owner/admin only
+- **getPublishedBySlug(slug)** — Increments viewCount atomically via repository update query
+- **listPublished(categorySlug, search, sort, pageable)** — Public, uses Specifications for filtering
+- **getOwn(id, principal)** — Owner/admin only
+- **listOwn(principal, status, pageable)** — Returns user's posts by status
+
+**Current User Resolution:**
+```java
+// In controllers: @AuthenticationPrincipal UserDetails principal
+// In services: principal.getUsername() → look up User via userRepository
+// Or via: principal.getAuthorities() to check if "ROLE_ADMIN"
+```
+
+**Slug Generation:**
+```java
+String slug = Slugs.uniqueSlug(request.getTitle(), postRepository::existsBySlug);
+// Util class: toSlug() normalizes string → lowercase, accent-stripped, hyphens
+// uniqueSlug() appends -2, -3… until unique
+```
+
+#### **UserService Interface + UserServiceImpl**
+- **getProfile(username)** — Returns UserResponse
+- **updateProfile(username, UpdateProfileRequest)** — Updates email (validates unique), displayName, bio, avatarUrl
+- **changePassword(username, ChangePasswordRequest)** — Validates current password, encodes new password
+
+#### **AuthenticationService Interface + AuthenticationServiceImpl**
+- **register(RegisterRequest)** — Creates user with USER role, generates JWT pair, saves refresh token
+- **login(LoginRequest)** — Validates credentials, checks active status, generates JWT pair
+- **refresh(RefreshTokenRequest)** — Validates refresh token, implements rotation (revokes old, issues new)
+- **logout(RefreshTokenRequest)** — Sets revoked=true on token
+
+---
+
+### 5. REPOSITORIES
+
+**Location:** `C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\repository\`
+
+#### **PostRepository** extends `JpaRepository&lt;Post, Long&gt;, JpaSpecificationExecutor&lt;Post&gt;`
+```java
+// Custom queries with JOIN FETCH (avoid N+1)
+@Query("SELECT p FROM Post p JOIN FETCH p.author LEFT JOIN FETCH p.category WHERE p.slug = :slug")
+Optional&lt;Post&gt; findBySlug(String slug);
+
+@Query("SELECT p FROM Post p JOIN FETCH p.author LEFT JOIN FETCH p.category WHERE p.slug = :slug AND p.status = :status")
+Optional&lt;Post&gt; findBySlugAndStatus(String slug, PostStatus status);
+
+@Query("SELECT p FROM Post p JOIN FETCH p.author LEFT JOIN FETCH p.category WHERE p.id = :id")
+Optional&lt;Post&gt; findByIdWithAuthorAndCategory(Long id);
+
+// View count atomic increment
+@Modifying
+@Query("UPDATE Post p SET p.viewCount = p.viewCount + 1 WHERE p.id = :id")
+void incrementViewCount(Long id);
+
+// Simple existence checks
+boolean existsBySlug(String slug);
+boolean existsByCategory(Category category);
+long countByAuthorUsername(String username);
+```
+
+**Filtering:** Uses `Specification&lt;Post&gt;` pattern (buildPublishedSpec, buildOwnSpec in service)
+
+#### **UserRepository** extends `JpaRepository&lt;User, Long&gt;, JpaSpecificationExecutor&lt;User&gt;`
+```java
+// All fetch roles eagerly to avoid N+1
+@Query("SELECT u FROM User u JOIN FETCH u.roles WHERE u.username = :username")
+Optional&lt;User&gt; findByUsernameWithRoles(String username);
+
+@Query("SELECT u FROM User u JOIN FETCH u.roles WHERE u.email = :email")
+Optional&lt;User&gt; findByEmailWithRoles(String email);
+
+@Query("SELECT u FROM User u JOIN FETCH u.roles WHERE u.username = :usernameOrEmail OR u.email = :usernameOrEmail")
+Optional&lt;User&gt; findByUsernameOrEmailWithRoles(String usernameOrEmail);
+
+// For login scenarios that accept username OR email
+Optional&lt;User&gt; findByUsername(String username);
+Optional&lt;User&gt; findByEmail(String email);
+
+// Existence checks
+boolean existsByUsername(String username);
+boolean existsByEmail(String email);
+boolean existsByEmailAndIdNot(String email, Long id);  // For unique validation on update
+```
+
+#### **CategoryRepository** extends `JpaRepository&lt;Category, Long&gt;`
+```java
+Optional&lt;Category&gt; findBySlug(String slug);
+boolean existsByName(String name);
+boolean existsByNameAndIdNot(String name, Long id);
+boolean existsBySlug(String slug);
+boolean existsBySlugAndIdNot(String slug, Long id);
+```
+
+#### **RefreshTokenRepository** extends `JpaRepository&lt;RefreshToken, Long&gt;`
+```java
+Optional&lt;RefreshToken&gt; findByToken(String token);
+
+@Modifying
+@Query("UPDATE RefreshToken rt SET rt.revoked = true WHERE rt.user = :user")
+void revokeAllByUser(User user);
+
+@Modifying
+@Query("DELETE FROM RefreshToken rt WHERE rt.expiresAt &lt; :now OR rt.revoked = true")
+void deleteExpiredAndRevoked(Instant now);
+```
+
+#### **RoleRepository** extends `JpaRepository&lt;Role, Long&gt;`
+```java
+Optional&lt;Role&gt; findByName(RoleName name);
+```
+
+---
+
+### 6. MAPPERS
+
+**Location:** `C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\mapper\`
+
+#### **PostMapper**
+```java
+@Component
+public class PostMapper {
+    private final CategoryMapper categoryMapper;
+
+    public PostResponse toResponse(Post post)
+        // Returns full DTO: all fields including contentMarkdown
+
+    public PostSummaryResponse toSummary(Post post)
+        // Returns list-friendly DTO: excludes contentMarkdown
+    
+    // Helper: toAuthorSummary(Post post)
+    // Helper: copyTags(Post post) — defensive copy of LinkedHashSet
+}
+```
+
+#### **UserMapper**
+```java
+@Component
+public class UserMapper {
+    public UserResponse toResponse(User user)
+        // Converts roles Set&lt;Role&gt; → List&lt;String&gt; (sorted by name)
+        // Includes: id, username, email, displayName, bio, avatarUrl, roles, active, createdAt
+}
+```
+
+#### **CategoryMapper**
+```java
+@Component
+public class CategoryMapper {
+    public CategoryResponse toResponse(Category category)
+        // Null-safe: returns null if category is null
+        // Returns: id, name, slug, description
+}
+```
+
+---
+
+### 7. SECURITY
+
+**Location:** `C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\security\` and `config/SecurityConfig.java`
+
+#### **JWT Authentication Flow**
+
+**JwtService** — Token generation &amp; validation
+```java
+// Access token: contains username + roles claim
+String generateAccessToken(UserDetails userDetails)
+    // Claims: subject=username, roles=[ROLE_ADMIN, ROLE_USER], type=access
+    // Signed with 256-bit HMAC-SHA key
+    // Expires: configurable (default 15 min)
+
+// Refresh token: opaque, stored in DB
+String generateRefreshToken(UserDetails userDetails)
+    // Claims: id=UUID, subject=username, type=refresh
+    // Expires: configurable (default 7 days)
+
+// Validation
+boolean isTokenValid(String token, UserDetails userDetails)
+    // Verifies signature, expiration, username match
+```
+
+**JwtAuthenticationFilter** — Per-request JWT extraction
+```java
+// Runs before UsernamePasswordAuthenticationFilter
+// Extracts "Authorization: Bearer &lt;token&gt;" header
+// On valid JWT:
+//   - Extracts username and roles from claims
+//   - Loads UserDetails via CustomUserDetailsService
+//   - Creates UsernamePasswordAuthenticationToken with ROLE_* authorities
+//   - Sets in SecurityContextHolder
+// On invalid JWT: continues unauthenticated (doesn't block)
+```
+
+**CustomUserDetailsService** — UserDetails loader
+```java
+// Implements UserDetailsService
+// loadUserByUsername() accepts username OR email
+// Fetches User with roles eagerly via JPA query
+// Maps roles: RoleName.ADMIN → authority "ROLE_ADMIN"
+// Returns Spring Security User with authorities
+```
+
+#### **SecurityConfig** — HTTP Authorization Rules
+```java
+@EnableWebSecurity
+@EnableMethodSecurity  // Enables @PreAuthorize annotations
+
+// Key configurations:
+csrf().disable() — No CSRF protection (API, JWT-based)
+sessionManagement(STATELESS) — No server-side sessions
+cors(corsConfigurationSource()) — Configurable origins
+
+// Path-based authorization:
+/api/auth/** → permitAll
+/api/admin/** → hasRole(ADMIN)
+/api/users/** → authenticated
+
+// Post endpoints:
+GET /api/posts (public) → permitAll
+GET /api/posts/{slug} (public) → permitAll
+GET /api/posts/mine, POST, PUT, DELETE → authenticated
+
+// Exception handling:
+401 Unauthorized → "Authentication required"
+403 Forbidden → "Access denied"
+
+// CORS configuration:
+allowedOrigins: ${CORS_ALLOWED_ORIGINS} (default: http://localhost:5173)
+allowedMethods: GET, POST, PUT, DELETE, OPTIONS, PATCH
+allowedHeaders: Authorization, Content-Type, Accept
+exposedHeaders: Authorization
+credentials: true, maxAge: 3600
+```
+
+#### **Role-Based Access**
+```java
+// In service layer:
+if (author.getRoles().stream().anyMatch(r -&gt; r.getName() == RoleName.ADMIN)) {
+    throw new ForbiddenOperationException("Admins cannot author posts");
+}
+
+// Owner/Admin check pattern:
+private void assertOwnerOrAdmin(Post post, UserDetails principal) {
+    boolean isAdmin = principal.getAuthorities().stream()
+        .map(GrantedAuthority::getAuthority)
+        .anyMatch(a -&gt; a.equals("ROLE_ADMIN"));
+    boolean isOwner = post.getAuthor().getUsername().equals(principal.getUsername());
+    if (!isOwner &amp;&amp; !isAdmin) {
+        throw new ForbiddenOperationException("...");
+    }
+}
+```
+
+---
+
+### 8. DATA INITIALIZATION
+
+**Location:** `C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\config\DataInitializer.java`
+
+Implements `ApplicationRunner` (runs on startup):
+
+```java
+@Transactional
+public void run(ApplicationArguments args) {
+    // 1. Ensure roles exist: ADMIN, USER
+    Role adminRole = ensureRole(RoleName.ADMIN);
+    Role userRole = ensureRole(RoleName.USER);
+
+    // 2. Seed admin user (both ADMIN + USER roles)
+    //    Username/email/password from appProperties (env vars configurable)
+    //    Default: admin@devblog.local / Admin@1234
+
+    // 3. Seed regular user (USER role only)
+    //    Default: user@devblog.local / User@1234
+
+    // 4. Seed 4 starter categories (idempotent if count == 0)
+    //    Java, Spring, Vue, DevOps
+
+    // 5. Seed 12 starter published posts (idempotent if count == 0)
+    //    - Various topics across categories
+    //    - Seeded with specific viewCounts
+    //    - All authored by seed user
+    //    - Timestamps span 30 days → 1 day ago
+}
+```
+
+**Slug generation in seeding:**
+```java
+String slug = Slugs.uniqueSlug(title, postRepository::existsBySlug);
+```
+
+---
+
+### 9. GLOBAL EXCEPTION HANDLING
+
+**Location:** `C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\controller\GlobalExceptionHandler.java`
+
+```java
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+    
+    // Validation errors (400)
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    → ErrorResponse with fieldErrors (List&lt;FieldErrorDetail&gt;)
+
+    // Domain exceptions (mapped):
+    ResourceNotFoundException → 404
+    DuplicateResourceException → 409
+    ForbiddenOperationException → 403
+    ConflictException → 409
+    BadCredentialsException → 401
+    InvalidTokenException → 401
+    IllegalArgumentException → 400
+    
+    // Generic fallback (500)
+    Exception.class → "Internal Server Error"
+}
+```
+
+**ErrorResponse Format:**
+```java
+{
+  "timestamp": "2024-06-20T10:30:00Z",
+  "status": 404,
+  "error": "Not Found",
+  "message": "Post not found with id: 123",
+  "fieldErrors": null  // or [{"field": "title", "message": "..."}]
+}
+```
+
+**Domain Exception Classes:**
+```
+C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\exception\
+  - ResourceNotFoundException
+  - ForbiddenOperationException
+  - DuplicateResourceException
+  - ConflictException
+  - BadCredentialsException
+  - InvalidTokenException
+```
+
+All extend `RuntimeException` with custom constructors for descriptive error messages.
+
+---
+
+### 10. KEY ARCHITECTURAL PATTERNS
+
+#### **N+1 Prevention**
+- PostRepository: All custom queries use `JOIN FETCH` for author and category
+- UserRepository: All custom queries use `JOIN FETCH u.roles`
+- Services specify LAZY relationships; data access via explicit queries
+
+#### **Optimistic Locking**
+- User and Post entities include `@Version Long version` field
+- Prevents concurrent update conflicts
+
+#### **View Count Implementation**
+- Simple `Long viewCount` field (not separate entity)
+- Atomic increment via `@Modifying @Query("UPDATE Post p SET p.viewCount = p.viewCount + 1")`
+- Called in `getPublishedBySlug()` on successful retrieval
+
+#### **Slug Generation**
+- URL-safe: lowercase, accent-normalized, hyphens for spaces
+- Unique: appends -2, -3, … suffix until unique
+- Immutable on update (slug never changes after creation)
+
+#### **Transactional Boundaries**
+- Services marked `@Transactional` (read-write operations)
+- List endpoints use `@Transactional(readOnly = true)`
+- Authentication flow ensures refresh token rotation
+
+#### **Security Patterns**
+- JWT tokens: stateless, signature-verified
+- Refresh token rotation: old token revoked, new token issued
+- Username/email dual-login support
+- Role-based authorization via Spring Security method annotations
+- CORS enabled for frontend consumption
+
+---
+
+### 11. CONFIGURATION FILES
+
+**application.yaml** — `C:\projects\develop_blog\backend\devblog\devblog\src\main\resources\application.yaml`
+
+```yaml
+spring:
+  datasource: jdbc:sqlite:devblog.db
+  jpa:
+    hibernate.ddl-auto: update
+    dialect: SQLiteDialect
+    show-sql: false
+    open-in-view: false
+
+jwt:
+  secret: ${JWT_SECRET:...}
+  access-expiration: 900000        # 15 minutes
+  refresh-expiration: 604800000    # 7 days
+
+app:
+  seed:
+    admin/user: {username, email, password}
+  security:
+    bcrypt-strength: 12
+
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+```
+
+**AppProperties** — `C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\config\AppProperties.java`
+- ConfigurationProperties binding (prefix: app)
+- Supports environment variable overrides
+
+---
+
+## Design Recommendations for Your Engagement Features
+
+Based on this architecture, here's how to implement your three features:
+
+### **1. Comments on Blog Posts**
+- **Entity:** Create `Comment.java` with fields: id, content, author (ManyToOne User), post (ManyToOne Post), createdAt, updatedAt, parentComment (self-referencing for threads)
+- **Repository:** `CommentRepository extends JpaRepository&lt;Comment, Long&gt;, JpaSpecificationExecutor&lt;Comment&gt;` with custom query for post comments with author eager-loaded
+- **DTOs:** CommentRequest (content), CommentResponse (id, content, author, createdAt, nested children)
+- **Service:** CommentService with create, update, delete, getByPost patterns
+- **Controller:** `/api/posts/{postId}/comments` endpoints
+- **Security:** Anyone can read; authenticated users can create; author/admin can edit/delete
+
+### **2. Like/Bookmark Articles**
+- **Entities:** Create `PostLike.java` (id, user, post, createdAt) and `PostBookmark.java` (id, user, post, createdAt)
+- **Unique constraints:** `@UniqueConstraint(columnNames = {"user_id", "post_id"})`
+- **Repositories:** CustomQueries to check if user liked/bookmarked, count likes
+- **Service:** Methods like `toggleLike(userId, postId)`, `getUserBookmarks(userId, pageable)`
+- **Controller:** `/api/posts/{postId}/likes`, `/api/users/me/bookmarks`
+- **Response:** Include `currentUserLiked`, `currentUserBookmarked`, `likeCount` in PostResponse
+
+### **3. View Author Info &amp; Published Posts**
+- **Add endpoints:** `GET /api/authors/{username}` → returns enhanced UserResponse with postCount, bio
+- **Add endpoint:** `GET /api/authors/{username}/posts?status=PUBLISHED` → returns Page&lt;PostSummaryResponse&gt;
+- **DTOs:** Extend UserResponse with `postCount`, maybe `latestPostDate`
+- **Repository:** Already have `countByAuthorUsername(username)` — use it
+- **Service:** UserService methods `getAuthorPublicProfile`, `getAuthorPublishedPosts`
+
+All patterns follow your existing conventions: Specifications for filtering, Mapper for DTOs, @AuthenticationPrincipal for auth, Transactional boundaries, and exception handling via GlobalExceptionHandler.</result>
+<usage><subagent_tokens>52337</subagent_tokens><tool_uses>52</tool_uses><duration_ms>105987</duration_ms></usage>
+</task-notification>
+
+[2026-06-20T17:23:05] (session 83a7eb29)
+<task-notification>
+<task-id>a86e896f0b8a38051</task-id>
+<tool-use-id>toolu_01JW633hj78rbDsAAC7NUdKt</tool-use-id>
+<output-file>C:\Users\ivan_\AppData\Local\Temp\claude\C--projects-develop-blog\83a7eb29-c46b-4633-bdce-6a2e065c10e5\tasks\a86e896f0b8a38051.output</output-file>
+<status>completed</status>
+<summary>Agent "Explore backend test patterns" came to rest</summary>
+<note>A task-notification fires each time this agent comes to rest with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Excellent! Now I have all the information needed. Let me provide a comprehensive report:
+
+---
+
+## Spring Boot Backend Test Suite Analysis — Developer Blog Platform
+
+I've conducted a thorough exploration of the test suite at `C:\projects\develop_blog\backend\devblog\devblog\src\test\`. Here's the complete test strategy documentation:
+
+---
+
+## 1. Test Structure &amp; Directory Layout
+
+**Root Test Directory:** `C:\projects\develop_blog\backend\devblog\devblog\src\test\`
+
+**Package Structure:**
+```
+src/test/
+├── java/met/ivan/devblog/
+│   ├── controller/              (5 files: @WebMvcTest slice tests)
+│   │   ├── AdminCategoryControllerTest.java
+│   │   ├── AdminUserControllerTest.java
+│   │   ├── AuthControllerTest.java
+│   │   ├── PostControllerTest.java
+│   │   └── UserControllerTest.java
+│   ├── integration/             (2 files: @SpringBootTest full-stack)
+│   │   ├── BlogPostManagementIntegrationTest.java
+│   │   └── UserManagementIntegrationTest.java
+│   ├── repository/              (4 files: @DataJpaTest slice tests)
+│   │   ├── CategoryRepositoryTest.java
+│   │   ├── PostRepositoryTest.java
+│   │   ├── RefreshTokenRepositoryTest.java
+│   │   └── UserRepositoryTest.java
+│   ├── service/                 (5 files: unit tests with Mockito)
+│   │   ├── AdminUserServiceImplTest.java
+│   │   ├── AuthenticationServiceImplTest.java
+│   │   ├── CategoryServiceImplTest.java
+│   │   ├── PostServiceImplTest.java
+│   │   └── UserServiceImplTest.java
+│   ├── security/                (1 file: unit test)
+│   │   └── JwtServiceTest.java
+│   ├── util/                    (1 file: utility tests)
+│   │   └── SlugsTest.java
+│   ├── TestDataFactory.java     (Shared test fixtures/builders)
+│   └── DevblogApplicationTests.java (Basic app context test)
+└── resources/
+    └── application-test.yaml    (Test DB config)
+```
+
+**Naming Conventions:**
+- Unit tests: `*ImplTest.java` (for service implementations)
+- Slice tests: `*Test.java` (controllers, repositories)
+- Integration tests: `*IntegrationTest.java`
+- Utility tests: `*Test.java` (for helper classes)
+- Convention: Class name mirrors the class under test (e.g., `PostServiceImpl` → `PostServiceImplTest`)
+
+**Total Test Count:** 20+ test files with ~150+ test methods
+
+---
+
+## 2. Unit Tests (Service Layer)
+
+**Framework:** Mockito + JUnit 5 + AssertJ
+
+**Pattern Structure:**
+```java
+@ExtendWith(MockitoExtension.class)
+@DisplayName("ServiceName")
+class ServiceNameImplTest {
+    
+    @Mock private DependencyRepository repo;
+    @Mock private AnotherService service;
+    @InjectMocks private ServiceNameImpl serviceUnderTest;
+    
+    @BeforeEach
+    void setUp() { /* prepare test data */ }
+    
+    @Test
+    @DisplayName("scenario description")
+    void methodName_condition_expectedResult() { /* test */ }
+}
+```
+
+**Example: PostServiceImplTest**
+- **File:** `C:\projects\develop_blog\backend\devblog\devblog\src\test\java\met\ivan\devblog\service\PostServiceImplTest.java`
+- **Mocking Pattern:**
+  ```java
+  @Mock private PostRepository postRepository;
+  @Mock private UserRepository userRepository;
+  @Mock private CategoryRepository categoryRepository;
+  @Mock private PostMapper postMapper;
+  
+  @InjectMocks
+  private PostServiceImpl postService;
+  ```
+
+- **Key Test Scenarios:**
+  - Authorization checks (admin denied, user allowed)
+  - Slug uniqueness (collision handling with `-2`, `-3` suffixes)
+  - Data transformation (tags normalized, published date set)
+  - Permission validation (non-owner forbidden, admin override)
+  - Complex business logic (sorting, filtering)
+
+- **Mocking Repositories:**
+  ```java
+  when(postRepository.findByIdWithAuthorAndCategory(10L))
+      .thenReturn(Optional.of(draftPost));
+  when(postRepository.save(any(Post.class)))
+      .thenAnswer(inv -&gt; inv.getArgument(0)); // identity mock
+  verify(postRepository).save(argThat(p -&gt; p.getStatus() == DRAFT));
+  ```
+
+- **UserDetails Mocking for Authorization:**
+  ```java
+  private UserDetails mockUserDetails(String username, String... roles) {
+      UserDetails ud = mock(UserDetails.class);
+      lenient().when(ud.getUsername()).thenReturn(username);
+      List&lt;SimpleGrantedAuthority&gt; authorities = Arrays.stream(roles)
+          .map(SimpleGrantedAuthority::new).toList();
+      lenient().doReturn(authorities).when(ud).getAuthorities();
+      return ud;
+  }
+  ```
+
+**Another Example: AuthenticationServiceImplTest**
+- **File:** `C:\projects\develop_blog\backend\devblog\devblog\src\test\java\met\ivan\devblog\service\AuthenticationServiceImplTest.java`
+- Tests registration, login, token refresh, password validation
+- Uses `ArgumentCaptor` and `ReflectionTestUtils` for complex assertions
+
+---
+
+## 3. Slice Tests
+
+### 3a. @WebMvcTest (Controller Tests)
+
+**Pattern:**
+```java
+@WebMvcTest(controllers = {PostController.class, GlobalExceptionHandler.class})
+@Import({SecurityConfig.class, JwtAuthenticationFilter.class, AppProperties.class})
+@ActiveProfiles("test")
+class PostControllerTest {
+    
+    @Autowired
+    private MockMvc mockMvc;
+    
+    @Autowired
+    private ObjectMapper objectMapper;
+    
+    @MockitoBean
+    private PostService postService;
+    
+    @MockitoBean
+    private JwtService jwtService;
+    
+    @MockitoBean
+    private CustomUserDetailsService customUserDetailsService;
+}
+```
+
+**Files:**
+- `C:\projects\develop_blog\backend\devblog\devblog\src\test\java\met\ivan\devblog\controller\PostControllerTest.java`
+- `C:\projects\develop_blog\backend\devblog\devblog\src\test\java\met\ivan\devblog\controller\AuthControllerTest.java`
+- `C:\projects\develop_blog\backend\devblog\devblog\src\test\java\met\ivan\devblog\controller\AdminCategoryControllerTest.java`
+
+**MockMvc Usage Example:**
+```java
+@Test
+@DisplayName("GET /api/posts - anonymous can list published posts (200)")
+void listPublished_anonymous_returns200() throws Exception {
+    Page&lt;PostSummaryResponse&gt; page = new PageImpl&lt;&gt;(
+        List.of(sampleSummary()), PageRequest.of(0, 20), 1);
+    when(postService.listPublished(isNull(), isNull(), isNull(), any()))
+        .thenReturn(page);
+
+    mockMvc.perform(get("/api/posts"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content[0].slug").value("test-post"));
+}
+```
+
+**Security Testing with @WithMockUser:**
+```java
+@Test
+@DisplayName("POST /api/posts - USER role returns 201")
+@WithMockUser(username = "testuser", roles = "USER")
+void createPost_user_returns201() throws Exception {
+    CreatePostRequest req = new CreatePostRequest(/* ... */);
+    when(postService.create(eq("testuser"), any())).thenReturn(sampleResponse());
+
+    mockMvc.perform(post("/api/posts")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(req)))
+            .andExpect(status().isCreated());
+}
+```
+
+**Admin-Only Endpoints with Authorization Tests:**
+```java
+@Test
+@DisplayName("POST /api/admin/categories - USER role returns 403")
+@WithMockUser(roles = "USER")
+void create_userRole_returns403() throws Exception {
+    mockMvc.perform(post("/api/admin/categories")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(/* ... */))
+            .andExpect(status().isForbidden());
+}
+
+@Test
+@DisplayName("POST /api/admin/categories - ADMIN role returns 201")
+@WithMockUser(roles = "ADMIN")
+void create_adminRole_returns201() throws Exception {
+    when(categoryService.create(any())).thenReturn(sampleCategory());
+    mockMvc.perform(post("/api/admin/categories")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(/* ... */))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.name").value("Java"));
+}
+```
+
+### 3b. @DataJpaTest (Repository Tests)
+
+**Pattern:**
+```java
+@DataJpaTest
+@ActiveProfiles("test")
+class UserRepositoryTest {
+    
+    @Autowired
+    private TestEntityManager em;
+    
+    @Autowired
+    private UserRepository userRepository;
+    
+    @BeforeEach
+    void setUp() {
+        // Persist test data
+        userRole = roleRepository.save(Role.builder().name(RoleName.USER).build());
+        author = em.persistAndFlush(User.builder()
+            .username("postauthor")
+            .email("postauthor@test.com")
+            .build());
+    }
+}
+```
+
+**Files:**
+- `C:\projects\develop_blog\backend\devblog\devblog\src\test\java\met\ivan\devblog\repository\PostRepositoryTest.java`
+- `C:\projects\develop_blog\backend\devblog\devblog\src\test\java\met\ivan\devblog\repository\UserRepositoryTest.java`
+- `C:\projects\develop_blog\backend\devblog\devblog\src\test\java\met\ivan\devblog\repository\CategoryRepositoryTest.java`
+
+**Key Features:**
+- Uses `TestEntityManager` for persistence operations
+- Tests JPA custom queries and Specifications
+- Tests database constraints (unique keys, foreign keys)
+- Tests JOIN FETCH strategies for eager loading
+
+**Example: JOIN FETCH Testing**
+```java
+@Test
+@DisplayName("findBySlug: loads author and category via JOIN FETCH")
+void findBySlug_loadsRelations() {
+    savePost("Java Basics", "java-basics", PostStatus.PUBLISHED, category);
+    em.clear(); // Clear persistence context to test lazy loading
+
+    Optional&lt;Post&gt; result = postRepository.findBySlug("java-basics");
+
+    assertThat(result).isPresent();
+    assertThat(result.get().getAuthor().getUsername()).isEqualTo("postauthor");
+    assertThat(result.get().getCategory().getName()).isEqualTo("Java");
+}
+```
+
+**Example: Specification Testing**
+```java
+@Test
+@DisplayName("Specification: filters by status=PUBLISHED")
+void specification_statusFilter() {
+    savePost("Published", "pub", PostStatus.PUBLISHED, category);
+    savePost("Draft", "draft", PostStatus.DRAFT, category);
+
+    Specification&lt;Post&gt; spec = (root, query, cb) -&gt; 
+        cb.equal(root.get("status"), PostStatus.PUBLISHED);
+    Page&lt;Post&gt; page = postRepository.findAll(spec, PageRequest.of(0, 10));
+
+    assertThat(page.getTotalElements()).isEqualTo(1);
+    assertThat(page.getContent().get(0).getSlug()).isEqualTo("pub");
+}
+```
+
+**Example: Constraint Violation Testing**
+```java
+@Test
+@DisplayName("Unique slug constraint: duplicate slug throws")
+void duplicateSlug_throws() {
+    savePost("First", "unique-slug", PostStatus.DRAFT, null);
+
+    Post dup = Post.builder()
+            .title("Second")
+            .slug("unique-slug")
+            .contentMarkdown("Content")
+            .build();
+
+    assertThatThrownBy(() -&gt; em.persistAndFlush(dup))
+            .isInstanceOf(Exception.class);
+}
+```
+
+---
+
+## 4. Integration Tests
+
+**Framework:** @SpringBootTest with TestRestTemplate
+
+**Pattern:**
+```java
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@ActiveProfiles("test")
+class BlogPostManagementIntegrationTest {
+    
+    @LocalServerPort
+    private int port;
+    
+    private final TestRestTemplate restTemplate = new TestRestTemplate();
+    
+    @Autowired
+    private PostRepository postRepository;
+    
+    private String baseUrl() {
+        return "http://localhost:" + port;
+    }
+    
+    private HttpHeaders bearerHeaders(String token) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(token);
+        return headers;
+    }
+}
+```
+
+**Files:**
+- `C:\projects\develop_blog\backend\devblog\devblog\src\test\java\met\ivan\devblog\integration\BlogPostManagementIntegrationTest.java`
+- `C:\projects\develop_blog\backend\devblog\devblog\src\test\java\met\ivan\devblog\integration\UserManagementIntegrationTest.java`
+
+**Key Features:**
+- Full application context loaded
+- Real HTTP client (TestRestTemplate)
+- Tests complete request-response cycles
+- Verifies database state changes
+
+**Authentication in Integration Tests:**
+```java
+private String loginToken(String usernameOrEmail, String password) {
+    LoginRequest req = new LoginRequest(usernameOrEmail, password);
+    ResponseEntity&lt;AuthResponse&gt; resp = restTemplate.postForEntity(
+            baseUrl() + "/api/auth/login",
+            new HttpEntity&lt;&gt;(req, jsonHeaders()),
+            AuthResponse.class);
+    assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+    return resp.getBody().getAccessToken();
+}
+
+// Usage:
+String userToken = loginToken("user", "User@1234");
+ResponseEntity&lt;PostResponse&gt; createResp = restTemplate.exchange(
+    baseUrl() + "/api/posts",
+    HttpMethod.POST,
+    new HttpEntity&lt;&gt;(createReq, bearerHeaders(userToken)),
+    PostResponse.class);
+```
+
+**Example: Full Post Lifecycle Test**
+```java
+@Test
+@DisplayName("User creates draft → absent from public list → present in /mine → publish → fetchable publicly")
+void fullPostLifecycle() {
+    String userToken = loginToken("user", "User@1234");
+
+    // 1. Create draft
+    CreatePostRequest createReq = new CreatePostRequest(
+            "Integration Test Post", "# Hello", "excerpt", null, 
+            PostStatus.DRAFT, null);
+    ResponseEntity&lt;PostResponse&gt; createResp = restTemplate.exchange(
+            baseUrl() + "/api/posts",
+            HttpMethod.POST,
+            new HttpEntity&lt;&gt;(createReq, bearerHeaders(userToken)),
+            PostResponse.class);
+    assertThat(createResp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    String postSlug = createResp.getBody().getSlug();
+
+    // 2. Draft absent from public list
+    ResponseEntity&lt;String&gt; publicList = restTemplate.getForEntity(
+            baseUrl() + "/api/posts", String.class);
+    assertThat(publicList.getBody()).doesNotContain(postSlug);
+
+    // 3. Draft present in /mine
+    ResponseEntity&lt;String&gt; mineResp = restTemplate.exchange(
+            baseUrl() + "/api/posts/mine",
+            HttpMethod.GET,
+            new HttpEntity&lt;&gt;(bearerHeaders(userToken)),
+            String.class);
+    assertThat(mineResp.getBody()).contains(postSlug);
+
+    // 4. Publish and verify public availability
+    UpdatePostStatusRequest publishReq = new UpdatePostStatusRequest(PostStatus.PUBLISHED);
+    ResponseEntity&lt;PostResponse&gt; publishResp = restTemplate.exchange(
+            baseUrl() + "/api/posts/" + postId + "/status",
+            HttpMethod.PUT,
+            new HttpEntity&lt;&gt;(publishReq, bearerHeaders(userToken)),
+            PostResponse.class);
+    assertThat(publishResp.getBody().getStatus()).isEqualTo(PostStatus.PUBLISHED);
+}
+```
+
+**Example: Permission/Authorization Testing at API Level**
+```java
+@Test
+@DisplayName("Second user cannot edit another user's post (403)")
+void secondUser_cannotEditOtherPost() {
+    String userToken = loginToken("user", "User@1234");
+    
+    // User1 creates post
+    CreatePostRequest createReq = new CreatePostRequest(
+            "User1 Post", "# Content", null, null, PostStatus.DRAFT, null);
+    ResponseEntity&lt;PostResponse&gt; createResp = restTemplate.exchange(
+            baseUrl() + "/api/posts",
+            HttpMethod.POST,
+            new HttpEntity&lt;&gt;(createReq, bearerHeaders(userToken)),
+            PostResponse.class);
+    Long postId = createResp.getBody().getId();
+
+    // User2 registers and attempts edit
+    RegisterRequest reg2 = new RegisterRequest(
+            "seconduser_blog", "seconduser_blog@test.com", "Password123!");
+    ResponseEntity&lt;AuthResponse&gt; reg2Resp = restTemplate.postForEntity(
+            baseUrl() + "/api/auth/register",
+            new HttpEntity&lt;&gt;(reg2, jsonHeaders()),
+            AuthResponse.class);
+    String token2 = reg2Resp.getBody().getAccessToken();
+
+    UpdatePostRequest updateReq = new UpdatePostRequest("Hacked Title", "Hacked", null, null, null);
+    ResponseEntity&lt;String&gt; editResp = restTemplate.exchange(
+            baseUrl() + "/api/posts/" + postId,
+            HttpMethod.PUT,
+            new HttpEntity&lt;&gt;(updateReq, bearerHeaders(token2)),
+            String.class);
+    assertThat(editResp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+}
+```
+
+**Test Database Configuration:**
+
+**File:** `C:\projects\develop_blog\backend\devblog\devblog\src\test\resources\application-test.yaml`
+```yaml
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+    show-sql: false
+  security:
+    user:
+      password: test
+
+jwt:
+  secret: test-secret-key-for-testing-only-must-be-256-bits-long-padding!!!
+  access-expiration: 900000
+  refresh-expiration: 604800000
+
+app:
+  seed:
+    admin:
+      username: admin
+      email: admin@devblog.local
+      password: Admin@1234
+    user:
+      username: user
+      email: user@devblog.local
+      password: User@1234
+```
+
+**Key Points:**
+- In-memory H2 database (ephemeral, fast)
+- `ddl-auto: create-drop` — schema created/dropped per test
+- Seeded admin user: `admin` / `Admin@1234` (both ADMIN + USER roles)
+- Seeded default user: `user` / `User@1234` (USER role only)
+- Test JWT secret (256-bit padded string)
+
+---
+
+## 5. Test Utilities &amp; Shared Fixtures
+
+### TestDataFactory
+
+**File:** `C:\projects\develop_blog\backend\devblog\devblog\src\test\java\met\ivan\devblog\TestDataFactory.java`
+
+**Purpose:** Centralized builders for domain entities in tests
+
+**Builder Methods:**
+```java
+public class TestDataFactory {
+    
+    public static Role userRole() {
+        return Role.builder().id(1L).name(RoleName.USER).build();
+    }
+    
+    public static Role adminRole() {
+        return Role.builder().id(2L).name(RoleName.ADMIN).build();
+    }
+    
+    public static User userWithRole(Role role) {
+        return User.builder()
+                .id(1L)
+                .username("testuser")
+                .email("test@example.com")
+                .passwordHash("$2a$04$hashed")
+                .displayName("Test User")
+                .bio("Test bio")
+                .active(true)
+                .roles(new HashSet&lt;&gt;(Set.of(role)))
+                .createdAt(Instant.now())
+                .build();
+    }
+    
+    public static User adminUser(Role adminRole, Role userRole) {
+        return User.builder()
+                .id(2L)
+                .username("admin")
+                .email("admin@example.com")
+                .passwordHash("$2a$04$hashed")
+                .displayName("Admin User")
+                .active(true)
+                .roles(new HashSet&lt;&gt;(Set.of(adminRole, userRole)))
+                .createdAt(Instant.now())
+                .build();
+    }
+    
+    public static Category category() {
+        return Category.builder()
+                .id(1L)
+                .name("Java")
+                .slug("java")
+                .description("Java programming")
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+    }
+    
+    public static Category category(Long id, String name, String slug) {
+        // Overload for custom values
+    }
+    
+    public static Post draftPost(User author, Category category) {
+        return Post.builder()
+                .id(10L)
+                .title("Test Post")
+                .slug("test-post")
+                .contentMarkdown("# Hello")
+                .excerpt("A test post")
+                .status(PostStatus.DRAFT)
+                .author(author)
+                .category(category)
+                .tags(new LinkedHashSet&lt;&gt;())
+                .viewCount(0L)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+    }
+    
+    public static Post publishedPost(User author, Category category) {
+        // With publishedAt set
+    }
+    
+    public static Post publishedPost(User author, Category category, 
+                                     Set&lt;String&gt; tags, long viewCount) {
+        // Full variant with tags and viewCount
+    }
+}
+```
+
+**Usage in Unit Tests:**
+```java
+@BeforeEach
+void setUp() {
+    userRole = TestDataFactory.userRole();
+    adminRole = TestDataFactory.adminRole();
+    regularUser = TestDataFactory.userWithRole(userRole);
+    adminUser = TestDataFactory.adminUser(adminRole, userRole);
+    category = TestDataFactory.category();
+    draftPost = TestDataFactory.draftPost(regularUser, category);
+    publishedPost = TestDataFactory.publishedPost(regularUser, category);
+}
+```
+
+### Utility Test Example
+
+**File:** `C:\projects\develop_blog\backend\devblog\devblog\src\test\java\met\ivan\devblog\util\SlugsTest.java`
+
+**Pattern: Parameterized Tests with @ParameterizedTest**
+```java
+@ParameterizedTest(name = "''{0}'' -&gt; ''{1}''")
+@CsvSource({
+    "Hello World,           hello-world",
+    "Spring Boot,           spring-boot",
+    "Java &amp; JVM,            java-jvm",
+    "  leading/trailing  ,  leading-trailing",
+    "Café au lait,          cafe-au-lait",
+})
+@DisplayName("toSlug converts titles to valid slugs")
+void toSlug_variousInputs(String input, String expected) {
+    assertThat(Slugs.toSlug(input.trim())).isEqualTo(expected.trim());
+}
+
+@Test
+@DisplayName("uniqueSlug: appends -2 on first collision")
+void uniqueSlug_oneCollision() {
+    Set&lt;String&gt; taken = Set.of("my-title");
+    String slug = Slugs.uniqueSlug("My Title", taken::contains);
+    assertThat(slug).isEqualTo("my-title-2");
+}
+```
+
+---
+
+## 6. Build/Test Configuration
+
+### pom.xml Test Dependencies
+
+**File:** `C:\projects\develop_blog\backend\devblog\devblog\pom.xml`
+
+**Key Test Dependencies:**
+```xml
+&lt;!-- Base test starter (includes JUnit 5, Mockito, AssertJ) --&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-boot-starter-test&lt;/artifactId&gt;
+    &lt;scope&gt;test&lt;/scope&gt;
+&lt;/dependency&gt;
+
+&lt;!-- Spring Boot 4 test slices (reorganized packages) --&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-boot-webmvc-test&lt;/artifactId&gt;
+    &lt;scope&gt;test&lt;/scope&gt;
+&lt;/dependency&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-boot-security-test&lt;/artifactId&gt;
+    &lt;scope&gt;test&lt;/scope&gt;
+&lt;/dependency&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-boot-data-jpa-test&lt;/artifactId&gt;
+    &lt;scope&gt;test&lt;/scope&gt;
+&lt;/dependency&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-boot-jpa-test&lt;/artifactId&gt;
+    &lt;scope&gt;test&lt;/scope&gt;
+&lt;/dependency&gt;
+
+&lt;!-- REST client testing --&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-boot-resttestclient&lt;/artifactId&gt;
+    &lt;scope&gt;test&lt;/scope&gt;
+&lt;/dependency&gt;
+
+&lt;!-- Security test utilities (@WithMockUser, etc.) --&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;org.springframework.security&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-security-test&lt;/artifactId&gt;
+    &lt;scope&gt;test&lt;/scope&gt;
+&lt;/dependency&gt;
+
+&lt;!-- H2 in-memory database for tests --&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;com.h2database&lt;/groupId&gt;
+    &lt;artifactId&gt;h2&lt;/artifactId&gt;
+    &lt;scope&gt;test&lt;/scope&gt;
+&lt;/dependency&gt;
+```
+
+**Transitive Dependencies Included:**
+- **JUnit 5** (Jupiter)
+- **Mockito** (with `@ExtendWith(MockitoExtension.class)`)
+- **AssertJ** (fluent assertions)
+- **Hamcrest**
+- **JsonPath** (for JSON response assertions)
+
+### Maven Compiler Configuration
+```xml
+&lt;configuration&gt;
+    &lt;release&gt;21&lt;/release&gt;
+    &lt;annotationProcessorPaths&gt;
+        &lt;path&gt;
+            &lt;groupId&gt;org.projectlombok&lt;/groupId&gt;
+            &lt;artifactId&gt;lombok&lt;/artifactId&gt;
+        &lt;/path&gt;
+    &lt;/annotationProcessorPaths&gt;
+&lt;/configuration&gt;
+```
+
+---
+
+## 7. Test Execution &amp; Profiles
+
+**Active Test Profile:** `@ActiveProfiles("test")`
+
+- All tests use the `test` profile
+- Loads `application-test.yaml` configuration
+- Uses H2 in-memory DB (not SQLite)
+- Separate test JWT secret and expiration times
+
+**Running Tests:**
+```bash
+mvn test                           # Run all tests
+mvn test -Dtest=PostControllerTest # Single test class
+mvn test -Dtest=PostControllerTest#testMethod # Single test method
+```
+
+---
+
+## 8. Key Testing Patterns &amp; Best Practices Observed
+
+### 1. **Authorization Matrix Testing**
+Every endpoint tests: anonymous (401), wrong role (403), correct role (200/201)
+
+### 2. **Mock vs. Real Database**
+- **Unit tests:** Mocked repositories (fast, isolated)
+- **Repository tests:** Real H2 DB with `TestEntityManager`
+- **Integration tests:** Full Spring context + real DB
+
+### 3. **Assertion Styles**
+- **AssertJ:** Primary assertion library (`assertThat(...).isEqualTo(...)`)
+- **MockMvc JsonPath:** For JSON response validation
+- **Mockito Verification:** For mock call verification
+
+### 4. **Test Naming Convention**
+Format: `methodName_condition_expectedResult`
+```java
+void create_asUser_createsDraft()
+void create_asAdmin_throwsForbidden()
+void listPublished_sortPopular_passesToService()
+void getBySlug_draft_returns404()
+```
+
+### 5. **Shared Test Data**
+- `TestDataFactory` for building entities
+- `@BeforeEach` for per-test setup
+- Helper methods in test class (e.g., `samplePost()`, `mockUserDetails()`)
+
+### 6. **Security Testing Patterns**
+- **Controller/Integration:** `@WithMockUser(username="...", roles="...")`
+- **Service layer:** Manual `UserDetails` mock with authorities
+- **Authorization filters:** Tested in `@WebMvcTest` with full security config imported
+
+### 7. **Response Verification**
+- **Controllers:** HttpStatus + JsonPath assertions
+- **Integration:** Full `ResponseEntity&lt;T&gt;` type-safe assertions
+- **Services:** Direct object assertions via AssertJ
+
+---
+
+## 9. Recommendations for Engagement Features (Comments, Likes, Bookmarks, Author Profiles)
+
+**For your new features, follow this strategy:**
+
+### Comments Feature
+1. **Unit Tests** (`CommentServiceImplTest`):
+   - Mock repositories, test CRUD operations
+   - Test authorization (only author/admin can delete)
+   - Test nested comment validation
+
+2. **Repository Tests** (`CommentRepositoryTest`):
+   - Test finding comments by post ID with pagination
+   - Test comment count by status (approved/pending/deleted)
+   - Test unique constraints
+
+3. **Controller Tests** (`PostCommentControllerTest`):
+   - `@WithMockUser` for authenticated comments
+   - Test anonymous cannot comment (401)
+   - Test comment moderation endpoints (admin only)
+
+4. **Integration Tests** (`CommentIntegrationTest`):
+   - Full lifecycle: create comment → edit → delete
+   - Permission checks (non-author cannot edit)
+   - Verify notification/event triggers
+
+### Likes/Bookmarks Feature
+1. **Unit Tests** (`LikeServiceImplTest`, `BookmarkServiceImplTest`):
+   - Test toggle operations (like/unlike)
+   - Test count aggregations
+   - Test uniqueness (user can like post only once)
+
+2. **Repository Tests**:
+   - Test finding by user + post ID
+   - Test pagination of user's likes/bookmarks
+   - Test count queries
+
+3. **Controller Tests**:
+   - `PUT /api/posts/{id}/like` (authenticated)
+   - GET endpoint returns like count + user's like status
+
+### Author Profiles
+1. **Unit Tests** (`AuthorProfileServiceImplTest`):
+   - Test profile data aggregation (post count, follower count)
+   - Test visibility rules (draft posts hidden except to author)
+
+2. **Repository Tests**:
+   - Test `findByUserIdWithStats()` query
+   - Test follower/following relationships
+
+3. **Controller Tests** (`AuthorProfileControllerTest`):
+   - Public profile endpoint (no auth needed)
+   - Update profile endpoint (authenticated, ownership check)
+
+4. **Integration Tests**:
+   - Full author profile retrieval with stats
+   - Follow/unfollow workflows
+
+**Apply the template test files provided above and use `TestDataFactory` for consistency.**
+
+---
+
+## Files Summary
+
+| Category | Key Files |
+|----------|-----------|
+| **Unit Tests** | PostServiceImplTest, AuthenticationServiceImplTest, CategoryServiceImplTest, UserServiceImplTest |
+| **Controller Slices** | PostControllerTest, AuthControllerTest, AdminCategoryControllerTest |
+| **Repository Slices** | PostRepositoryTest, UserRepositoryTest, CategoryRepositoryTest |
+| **Integration Tests** | BlogPostManagementIntegrationTest, UserManagementIntegrationTest |
+| **Utilities** | TestDataFactory, SlugsTest, JwtServiceTest |
+| **Config** | application-test.yaml, pom.xml (test section) |
+
+This comprehensive test suite provides a solid foundation for your engagement features. All tests are discoverable, well-documented with `@DisplayName`, and follow consistent patterns with Spring Boot 4 best practices.</result>
+<usage><subagent_tokens>53158</subagent_tokens><tool_uses>21</tool_uses><duration_ms>97024</duration_ms></usage>
+</task-notification>
+
+[2026-06-20T17:30:35] (session 83a7eb29)
+checkout new branch and commit pusht it
+
