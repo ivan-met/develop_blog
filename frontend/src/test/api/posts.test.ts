@@ -41,6 +41,9 @@ const mockPost = {
   updatedAt: '2025-01-01T00:00:00Z',
   tags: ['vue', 'frontend'],
   viewCount: 42,
+  likeCount: 0,
+  liked: false,
+  bookmarked: false,
 }
 
 const mockPage = {

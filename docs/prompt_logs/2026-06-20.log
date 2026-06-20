@@ -2682,3 +2682,170 @@ This comprehensive test suite provides a solid foundation for your engagement fe
 [2026-06-20T17:30:35] (session 83a7eb29)
 checkout new branch and commit pusht it
 
+[2026-06-20T22:38:40] (session 775762fb)
+remove untrached files
+
+[2026-06-20T22:40:44] (session baecc0a8)
+execute plan @docs/plans/engagement-features.md . If some of the subagent has probles dont take over and ask for permission for the subagent.
+
+[2026-06-20T22:57:09] (session baecc0a8)
+<task-notification>
+<task-id>a5e4a010860c9b985</task-id>
+<tool-use-id>toolu_014roGnr3tohmxLvD52MPkPJ</tool-use-id>
+<output-file>C:\Users\ivan_\AppData\Local\Temp\claude\C--projects-develop-blog\baecc0a8-a660-405b-b5f6-66905f703f3a\tasks\a5e4a010860c9b985.output</output-file>
+<status>completed</status>
+<summary>Agent "Implement engagement backend" came to rest</summary>
+<note>A task-notification fires each time this agent comes to rest with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>`UserController` uses `@RequestMapping("/api/users")` and has `GET /me`, `PUT /me`, `PUT /me/password`. My `EngagementController` adds `GET /api/users/me/bookmarks` with the full path inline. There's no conflict since both are handled by different controllers, and Spring MVC routes by exact path match. `GET /api/users/me/bookmarks` is more specific than `GET /api/users/me` so Spring MVC will route it correctly. 
+
+Let me now run a final consistency check on the test resource usage. The `EngagementControllerTest` has `@WebMvcTest` on `{EngagementController.class, GlobalExceptionHandler.class}`. But the `EngagementController` handles `/api/users/me/bookmarks` which is also in the `UserController` base path. Since `@WebMvcTest` only loads the specified controllers, there's no conflict. The test is isolated to `EngagementController`.
+
+Now I need to run the tests. I need Bash access for this. Let me check if there's a way:
+
+The Bash tool is the only way to run the build. I cannot use alternative tools for this — there's no Read/Write/Edit equivalent for running shell commands. I need to ask the user for Bash permission.
+
+**STOP: I cannot run the tests without Bash tool access, which is being denied.**
+
+Here is what I have built and the current state:
+
+---
+
+## Summary of Files Created/Changed
+
+### New Entity Files
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/entity/Comment.java`
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/entity/PostLike.java`
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/entity/PostBookmark.java`
+
+### New Repository Files
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/repository/CommentRepository.java`
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/repository/PostLikeRepository.java`
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/repository/PostBookmarkRepository.java`
+
+### New/Modified DTO Files
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/dto/PostResponse.java` — added `likeCount`, `liked`, `bookmarked`
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/dto/PostSummaryResponse.java` — added `likeCount`
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/dto/CommentResponse.java` (new)
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/dto/CreateCommentRequest.java` (new)
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/dto/LikeResponse.java` (new)
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/dto/BookmarkResponse.java` (new)
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/dto/AuthorProfileResponse.java` (new)
+
+### New/Modified Mapper Files
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/mapper/PostMapper.java` — overloaded `toResponse` and `toSummary` with engagement params
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/mapper/CommentMapper.java` (new)
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/mapper/UserMapper.java` — added `toAuthorProfile`
+
+### New/Modified Service Files
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/service/PostService.java` — updated `getPublishedBySlug` and `listPublished` signatures to accept `UserDetails principal`
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/service/CommentService.java` (new)
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/service/EngagementService.java` (new)
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/service/AuthorService.java` (new)
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/service/impl/PostServiceImpl.java` — batch like counts, engagement enrichment
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/service/impl/CommentServiceImpl.java` (new)
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/service/impl/EngagementServiceImpl.java` (new)
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/service/impl/AuthorServiceImpl.java` (new)
+
+### New/Modified Controller Files
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/controller/PostController.java` — passes principal to service
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/controller/CommentController.java` (new)
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/controller/EngagementController.java` (new)
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/controller/AuthorController.java` (new)
+
+### Config Changes
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/config/SecurityConfig.java` — added `/api/authors/**` public GET rule
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/config/DataInitializer.java` — seeds comments and likes
+
+### New/Modified Test Files
+- `/backend/devblog/devblog/src/test/java/met/ivan/devblog/service/PostServiceImplTest.java` — updated for new signatures + engagement tests
+- `/backend/devblog/devblog/src/test/java/met/ivan/devblog/controller/PostControllerTest.java` — updated for new DTO constructors and method signatures
+- `/backend/devblog/devblog/src/test/java/met/ivan/devblog/service/CommentServiceImplTest.java` (new)
+- `/backend/devblog/devblog/src/test/java/met/ivan/devblog/service/EngagementServiceImplTest.java` (new)
+- `/backend/devblog/devblog/src/test/java/met/ivan/devblog/service/AuthorServiceImplTest.java` (new)
+- `/backend/devblog/devblog/src/test/java/met/ivan/devblog/repository/CommentRepositoryTest.java` (new)
+- `/backend/devblog/devblog/src/test/java/met/ivan/devblog/repository/PostLikeRepositoryTest.java` (new)
+- `/backend/devblog/devblog/src/test/java/met/ivan/devblog/repository/PostBookmarkRepositoryTest.java` (new)
+- `/backend/devblog/devblog/src/test/java/met/ivan/devblog/controller/CommentControllerTest.java` (new)
+- `/backend/devblog/devblog/src/test/java/met/ivan/devblog/controller/EngagementControllerTest.java` (new)
+- `/backend/devblog/devblog/src/test/java/met/ivan/devblog/controller/AuthorControllerTest.java` (new)
+- `/backend/devblog/devblog/src/test/java/met/ivan/devblog/integration/EngagementIntegrationTest.java` (new)
+
+## Blocker: Cannot Run Tests
+
+The `Bash` tool is being denied in this session, which means I cannot execute `mvnw.cmd test` to verify the build. **The code is complete and consistent**, but I cannot confirm a green test run.
+
+To run the tests yourself:
+```powershell
+$env:JAVA_HOME = 'C:\Users\ivan_\.jdks\corretto-21.0.11'
+cd C:\projects\develop_blog\backend\devblog\devblog
+.\mvnw.cmd test
+```
+
+## API Contract Changes for Frontend
+
+The `PostService.getPublishedBySlug` and `listPublished` now require an extra `UserDetails principal` parameter (nullable). The existing `PostController` was updated to pass the `@AuthenticationPrincipal`. No other public interface changed from the frontend perspective — the REST API matches the plan exactly.
+
+**Key deviation from plan**: `PostService` interface methods changed signatures (added `principal` param). This is an internal backend change only — the REST API surface is unchanged.</result>
+<usage><subagent_tokens>140326</subagent_tokens><tool_uses>103</tool_uses><duration_ms>958018</duration_ms></usage>
+</task-notification>
+
+[2026-06-20T22:58:45] (session baecc0a8)
+<task-notification>
+<task-id>af73dc0afbbcf738b</task-id>
+<tool-use-id>toolu_01CLTreHWyZYZ1a8vWn4fWde</tool-use-id>
+<output-file>C:\Users\ivan_\AppData\Local\Temp\claude\C--projects-develop-blog\baecc0a8-a660-405b-b5f6-66905f703f3a\tasks\af73dc0afbbcf738b.output</output-file>
+<status>completed</status>
+<summary>Agent "Verify and fix engagement backend" came to rest</summary>
+<note>A task-notification fires each time this agent comes to rest with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>I need Bash tool access to run the Maven test suite and fix any compilation errors. The task fundamentally requires:
+
+1. Running `ls` to verify the JDK path exists
+2. Running `./mvnw.cmd test` to execute the test suite
+3. Potentially editing files to fix compile errors
+4. Re-running tests to confirm fixes
+
+The Read, Edit, and Write tools are available for file work, but without Bash I cannot execute commands. Could you please grant Bash tool permission? This is essential to verify the build and fix any failing tests as requested.</result>
+<usage><subagent_tokens>13031</subagent_tokens><tool_uses>2</tool_uses><duration_ms>10858</duration_ms></usage>
+</task-notification>
+
+[2026-06-20T23:00:53] (session baecc0a8)
+<task-notification>
+<task-id>a0761b30a31ef684c</task-id>
+<tool-use-id>toolu_01Rt394tARmS4TWGohTETKd1</tool-use-id>
+<output-file>C:\Users\ivan_\AppData\Local\Temp\claude\C--projects-develop-blog\baecc0a8-a660-405b-b5f6-66905f703f3a\tasks\a0761b30a31ef684c.output</output-file>
+<status>completed</status>
+<summary>Agent "Verify and fix engagement backend" came to rest</summary>
+<note>A task-notification fires each time this agent comes to rest with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>All tool calls are being denied. The sandbox is blocking everything — Bash, Glob, Read, and Skill all denied. This appears to be a permission configuration issue where the background agent environment hasn't been set up with the necessary allowlist.
+
+I need you to take one of the following actions to unblock me:
+
+**Option 1 (quickest):** Run this command yourself in a terminal and paste back the output:
+```
+ls /c/Users/ivan_/.jdks/
+```
+Then I can confirm the JDK path and proceed.
+
+**Option 2:** Grant the permission prompts by approving the tool calls when they appear, or configure the allowlist in `.claude/settings.json` to permit:
+- `Bash` (for running `cd /c/projects/develop_blog/backend/devblog/devblog &amp;&amp; JAVA_HOME=... ./mvnw.cmd test`)
+- `Read` (for reading source files)
+- `Glob` (for file discovery)
+
+**Option 3:** Run the test suite yourself:
+```
+cd C:\projects\develop_blog\backend\devblog\devblog
+set JAVA_HOME=C:\Users\ivan_\.jdks\corretto-21.0.11
+mvnw.cmd test
+```
+And paste the output here so I can diagnose and fix any failures.
+
+The task requires me to run tests and fix compile errors, which requires Bash access and file read/write access. Without those permissions being granted, I cannot proceed with verification or fixes.</result>
+<usage><subagent_tokens>13924</subagent_tokens><tool_uses>5</tool_uses><duration_ms>23443</duration_ms></usage>
+</task-notification>
+
+[2026-06-20T23:06:04] (session baecc0a8)
+there is not permission mode
+
+[2026-06-20T23:24:17] (session 7475f43e)
+commit and push
+

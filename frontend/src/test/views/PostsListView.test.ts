@@ -47,6 +47,7 @@ const makePost = (overrides: Partial<PostSummaryResponse> = {}): PostSummaryResp
   createdAt: '2025-01-01T00:00:00Z',
   tags: ['spring', 'jwt'],
   viewCount: 10,
+  likeCount: 0,
   ...overrides,
 })
 

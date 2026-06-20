@@ -40,6 +40,7 @@ const mockDraftPost = {
   createdAt: '2025-01-01T00:00:00Z',
   tags: [] as string[],
   viewCount: 0,
+  likeCount: 0,
 }
 
 const mockPublishedPost = {
@@ -54,6 +55,7 @@ const mockPublishedPost = {
   createdAt: '2025-01-01T00:00:00Z',
   tags: [] as string[],
   viewCount: 5,
+  likeCount: 0,
 }
 
 const mockPage = (content: PostSummaryResponse[]) => ({

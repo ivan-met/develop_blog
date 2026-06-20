@@ -20,9 +20,18 @@ public interface PostService {
 
     void delete(Long id, UserDetails principal);
 
-    PostResponse getPublishedBySlug(String slug);
+    /**
+     * Get a published post by slug, enriching with engagement data for the given principal
+     * (null principal → liked/bookmarked will be null/omitted).
+     */
+    PostResponse getPublishedBySlug(String slug, UserDetails principal);
 
-    Page<PostSummaryResponse> listPublished(String categorySlug, String search, String sort, Pageable pageable);
+    /**
+     * List published posts, enriching summaries with like counts (batch, no N+1).
+     * Principal is used for per-user flags — pass null for anonymous.
+     */
+    Page<PostSummaryResponse> listPublished(String categorySlug, String search, String sort,
+                                            Pageable pageable, UserDetails principal);
 
     PostResponse getOwn(Long id, UserDetails principal);
 

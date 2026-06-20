@@ -96,6 +96,14 @@ function closeMobileMenu() {
               >
                 My posts
               </RouterLink>
+              <RouterLink
+                to="/me/bookmarks"
+                class="nav-link px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
+                style="color: #8B949E;"
+                active-class="nav-link-active"
+              >
+                Bookmarks
+              </RouterLink>
             </template>
 
             <RouterLink
@@ -219,6 +227,15 @@ function closeMobileMenu() {
               @click="closeMobileMenu"
             >
               My posts
+            </RouterLink>
+            <RouterLink
+              to="/me/bookmarks"
+              class="block px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
+              style="color: #8B949E;"
+              active-class="nav-link-active"
+              @click="closeMobileMenu"
+            >
+              Bookmarks
             </RouterLink>
           </template>
 

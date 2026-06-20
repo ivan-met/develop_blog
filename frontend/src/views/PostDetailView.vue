@@ -2,11 +2,17 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { postsApi } from '@/api/posts'
+import { commentsApi } from '@/api/comments'
 import { useAuthStore } from '@/stores/auth'
 import MarkdownPreview from '@/components/MarkdownPreview.vue'
 import AppButton from '@/components/AppButton.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
-import type { PostResponse } from '@/api/types'
+import LikeButton from '@/components/LikeButton.vue'
+import BookmarkButton from '@/components/BookmarkButton.vue'
+import AuthorByline from '@/components/AuthorByline.vue'
+import CommentList from '@/components/CommentList.vue'
+import CommentForm from '@/components/CommentForm.vue'
+import type { PostResponse, CommentResponse } from '@/api/types'
 import axios from 'axios'
 
 const route = useRoute()
@@ -17,6 +23,9 @@ const post = ref<PostResponse | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 const notFound = ref(false)
+const commentListRef = ref<InstanceType<typeof CommentList> | null>(null)
+const commentError = ref<string | null>(null)
+const commentSubmitting = ref(false)
 
 // Owner: author id matches current user, or current user is admin
 const canEdit = ref(false)
@@ -56,6 +65,20 @@ onMounted(async () => {
 function goEdit() {
   if (post.value) {
     router.push(`/posts/${post.value.id}/edit`)
+  }
+}
+
+async function handleCommentSubmit(content: string) {
+  if (!post.value) return
+  commentError.value = null
+  commentSubmitting.value = true
+  try {
+    const newComment: CommentResponse = await commentsApi.create(post.value.slug, { content })
+    commentListRef.value?.prependComment(newComment)
+  } catch {
+    commentError.value = 'Failed to post comment. Please try again.'
+  } finally {
+    commentSubmitting.value = false
   }
 }
 </script>
@@ -132,18 +155,8 @@ function goEdit() {
             {{ post.category.name }}
           </span>
 
-          <!-- Author -->
-          <div class="flex items-center gap-1.5">
-            <div
-              class="w-5 h-5 rounded-full flex items-center justify-center text-xs font-mono font-semibold flex-shrink-0"
-              style="background-color: #1C2128; color: #E6A817; border: 1px solid #30363D; font-family: 'JetBrains Mono', monospace;"
-            >
-              {{ (post.author.displayName ?? post.author.username).charAt(0).toUpperCase() }}
-            </div>
-            <span class="text-sm" style="color: #8B949E;">
-              {{ post.author.displayName ?? post.author.username }}
-            </span>
-          </div>
+          <!-- Author byline -->
+          <AuthorByline :author="post.author" />
 
           <!-- Published date -->
           <span class="text-sm" style="color: #8B949E;">
@@ -156,6 +169,21 @@ function goEdit() {
               Edit
             </AppButton>
           </div>
+        </div>
+
+        <!-- Like + Bookmark row -->
+        <div class="flex items-center gap-2 mt-4">
+          <LikeButton
+            :slug="post.slug"
+            :liked="post.liked"
+            :like-count="post.likeCount"
+            @change="(liked, likeCount) => { if (post) { post.liked = liked; post.likeCount = likeCount } }"
+          />
+          <BookmarkButton
+            :slug="post.slug"
+            :bookmarked="post.bookmarked"
+            @change="(bookmarked) => { if (post) post.bookmarked = bookmarked }"
+          />
         </div>
 
         <!-- Divider -->
@@ -183,6 +211,31 @@ function goEdit() {
           Edit post
         </AppButton>
       </div>
+
+      <!-- Discussion section -->
+      <section class="mt-12" aria-label="Discussion">
+        <div style="border-top: 1px solid #30363D;" class="pt-8">
+          <p
+            class="text-xs font-mono mb-6"
+            style="color: #E6A817; font-family: 'JetBrains Mono', monospace;"
+            aria-hidden="true"
+          >// discussion</p>
+
+          <!-- Comment form -->
+          <div class="mb-8">
+            <AlertMessage
+              v-if="commentError"
+              type="error"
+              :message="commentError"
+              class="mb-3"
+            />
+            <CommentForm @submitted="handleCommentSubmit" />
+          </div>
+
+          <!-- Comment list -->
+          <CommentList ref="commentListRef" :slug="post.slug" />
+        </div>
+      </section>
     </article>
   </div>
 </template>

@@ -21,6 +21,7 @@ const basePost: PostSummaryResponse = {
   createdAt: '2025-03-14T00:00:00Z',
   tags: ['vue', 'composition-api', 'typescript'],
   viewCount: 1250,
+  likeCount: 0,
 }
 
 function createTestRouter() {

@@ -53,6 +53,9 @@ const mockPost = {
   updatedAt: '2025-01-01T00:00:00Z',
   tags: ['vue', 'typescript'],
   viewCount: 0,
+  likeCount: 0,
+  liked: false,
+  bookmarked: false,
 }
 
 function createTestRouter() {

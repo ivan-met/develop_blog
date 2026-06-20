@@ -33,13 +33,16 @@ public class PostController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String sort,
-            @PageableDefault(size = 20) Pageable pageable) {
-        return postService.listPublished(category, search, sort, pageable);
+            @PageableDefault(size = 20) Pageable pageable,
+            @AuthenticationPrincipal UserDetails principal) {
+        return postService.listPublished(category, search, sort, pageable, principal);
     }
 
     @GetMapping("/{slug}")
-    public PostResponse getBySlug(@PathVariable String slug) {
-        return postService.getPublishedBySlug(slug);
+    public PostResponse getBySlug(
+            @PathVariable String slug,
+            @AuthenticationPrincipal UserDetails principal) {
+        return postService.getPublishedBySlug(slug, principal);
     }
 
     // --- Authenticated authoring ---
