@@ -1,3 +1,819 @@
 [2026-06-20T16:10:35] (session e85beb41)
 checkout new branch and commit/push changes
 
+[2026-06-20T16:20:47] (session ddb8db21)
+Create plan for implementation of feature:
+Content Discovery
+•    Browse posts by category
+•    Search posts by title, content, or tags
+•    View latest and most popular articles
+•    Filter content by technology
+
+Delegate frontend and backend tasks to the relevant subagents. Plan should consider the test strategy. Seed posts and in the application, user the default "user" user as author. Ask questions if needed
+
+[2026-06-20T16:22:28] (session ddb8db21)
+<task-notification>
+<task-id>aa86798ec49db8978</task-id>
+<tool-use-id>toolu_01GTofFvLkdex9RCmudtQPyd</tool-use-id>
+<output-file>C:\Users\ivan_\AppData\Local\Temp\claude\C--projects-develop-blog\ddb8db21-0bb7-4d3a-ba7a-96d8933178df\tasks\aa86798ec49db8978.output</output-file>
+<status>completed</status>
+<summary>Agent "Explore frontend posts browsing" came to rest</summary>
+<note>A task-notification fires each time this agent comes to rest with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Excellent! Now I have a comprehensive understanding of the frontend structure. Let me create a final summary report:
+
+## Frontend Content Discovery Feature Analysis
+
+I've completed a thorough exploration of the Vue 3 + TypeScript frontend architecture. Here's the detailed breakdown organized by your requirements:
+
+---
+
+### 1. API Client Layer (`C:\projects\develop_blog\frontend\src\api\`)
+
+**Post-Related API Functions** (`posts.ts`):
+- **`listPublished(params)`** - Public endpoint, accepts `category`, `search`, `page`, `size`
+- **`getBySlug(slug)`** - Fetch single published post by slug
+- **`listMine(params)`** - Authenticated, lists user's own posts with optional `status` filter (DRAFT/PUBLISHED)
+- **`getMine(id)`** - Fetch one of user's posts for editing
+- **`create(data)`** - Create new post with `CreatePostRequest`
+- **`update(id, data)`** - Update post with `UpdatePostRequest`
+- **`changeStatus(id, data)`** - Change post status (publish/unpublish)
+- **`remove(id)`** - Delete a post
+
+**Key Types** (`types.ts`):
+```typescript
+// Domain types
+PostStatus = 'DRAFT' | 'PUBLISHED'
+PostSummaryResponse: { id, slug, title, excerpt, status, category, author, publishedAt, createdAt }
+PostResponse extends PostSummaryResponse: { contentMarkdown, updatedAt }
+CategoryResponse: { id, name, slug, description }
+AuthorSummary: { id, username, displayName }
+Page&lt;T&gt;: { content: T[], totalElements, totalPages, number, size, first, last }
+```
+
+**Query Parameters &amp; Pagination**:
+- Pagination: `{ page: number, size: number }` (zero-indexed pages)
+- Post listing: `postsApi.listPublished({ category?: string, search?: string, page?: number, size?: number })`
+- Uses axios instance with baseURL `/api` and Bearer token injection via interceptor
+
+**HTTP Client** (`http.ts`):
+- Axios instance with baseURL `/api`
+- Request interceptor: Attaches `Authorization: Bearer {token}` header
+- Response interceptor: Handles 401 errors with token refresh, queues pending requests during refresh, logs out on final failure
+- Prevents concurrent refresh attempts using `isRefreshing` flag
+
+**Categories API** (`categories.ts`):
+- `list()` - Get all categories
+- `getBySlug(slug)` - Get single category
+- `create(data)`, `update(id, data)`, `remove(id)` - Admin endpoints
+
+---
+
+### 2. Existing Views/Pages (`C:\projects\develop_blog\frontend\src\views\`)
+
+| View | Path | Purpose | Features |
+|------|------|---------|----------|
+| **PostsListView.vue** | `/` (home) | Browse &amp; search published posts | Search (350ms debounce), category filters (chips), pagination (12 items/page), grid layout (3 cols on lg), loading skeletons, empty state |
+| **PostDetailView.vue** | `/posts/:slug` | View single post | Markdown rendering, author info with avatar, publish date, edit button (for owner/admin), 404 handling |
+| **MyPostsView.vue** | `/me/posts` | User's own posts | Status filter tabs (All/Drafts/Published), publish/unpublish toggle, delete with confirmation, edit navigation, table layout, pagination (20 items/page) |
+| **PostEditorView.vue** | `/posts/new`, `/posts/:id/edit` | Create/edit posts | Form validation, markdown editor, category selector, status badge, auto-save drafts |
+| **CategoriesView.vue** (admin) | `/admin/categories` | Manage categories | CRUD operations, side panel for form, validation, delete with conflict handling |
+
+**Key Patterns**:
+- Loading states with skeleton placeholders
+- Optimistic error handling with AlertMessage component
+- Router guards for auth/admin protection
+- Responsive grid/table layouts with Tailwind
+
+---
+
+### 3. Routing (`C:\projects\develop_blog\frontend\src\router\index.ts`)
+
+| Route | Meta | Component | Notes |
+|-------|------|-----------|-------|
+| `/` | `public: true` | PostsListView | Home/browse page |
+| `/login` | `public: true, redirectIfAuth: true` | LoginView | Redirects authenticated users to home |
+| `/register` | `public: true, redirectIfAuth: true` | RegisterView | Redirects authenticated users to home |
+| `/posts/:slug` | `public: true` | PostDetailView | Public post detail |
+| `/posts/new` | `requiresAuth: true` | PostEditorView | Create new post |
+| `/posts/:id/edit` | `requiresAuth: true` | PostEditorView | Edit own post |
+| `/me/posts` | `requiresAuth: true` | MyPostsView | User's post management |
+| `/profile` | `requiresAuth: true` | ProfileView | User profile |
+| `/admin/users` | `requiresAuth: true, requiresAdmin: true` | UsersView | Admin user management |
+| `/admin/categories` | `requiresAuth: true, requiresAdmin: true` | CategoriesView | Admin category management |
+
+**Guards** (`beforeEach`):
+- Redirects authenticated users away from login/register
+- Protects `requiresAuth` routes (redirects to `/login` with redirect query param)
+- Protects `requiresAdmin` routes (checks admin role, waits for user load if needed)
+- Loads current user if admin route requires it
+
+---
+
+### 4. Reusable Components (`C:\projects\develop_blog\frontend\src\components\`)
+
+| Component | Purpose | Props | Key Features |
+|-----------|---------|-------|--------------|
+| **PostCard.vue** | Post summary card in grids | `post: PostSummaryResponse`, `showStatus?: boolean` | Category chip, title (2-line clamp), excerpt (3-line clamp), author avatar+name, date, hover effects |
+| **CategorySelect.vue** | Category dropdown | `modelValue: number \| null`, `hasError?: boolean`, `disabled?: boolean` | Loads categories on mount, custom chevron icon, focus border color changes |
+| **StatusBadge.vue** | Status indicator | `status: PostStatus` | Green for PUBLISHED, gray for DRAFT |
+| **AppButton.vue** | Styled button | `type?: 'button' \| 'submit' \| 'reset'`, `variant?: 'primary' \| 'secondary' \| 'danger' \| 'ghost'`, `disabled?`, `loading?`, `fullWidth?` | 4 variants with hover states, loading spinner |
+| **AppInput.vue** | Text input | `id`, `type`, `placeholder`, `modelValue`, `hasError?`, `disabled?`, `autocomplete?` | Focus/blur border color changes, error state styling |
+| **FormField.vue** | Form label + input wrapper | `id`, `label`, `error?`, `hint?` | Accessible labels, error/hint text display |
+| **AlertMessage.vue** | Alert box | `type: 'error' \| 'success' \| 'info'`, `message: string` | 3 types with distinct colors, ARIA live region |
+| **MarkdownPreview.vue** | Render markdown | `content: string` | Uses markdown-it + highlight.js, sanitized with dompurify |
+| **MarkdownEditor.vue** | Markdown editor | Two-pane editor/preview |  |
+| **StatusBadge.vue** | Status display | Shows DRAFT or PUBLISHED with colors |  |
+| **NavBar.vue** | Navigation | Links to home, login, profile, admin, logout |  |
+
+---
+
+### 5. Composables (`C:\projects\develop_blog\frontend\src\composables\`)
+
+**`useFormValidation.ts`**:
+```typescript
+useFormValidation&lt;T extends Record&lt;string, string&gt;&gt;(fields: T)
+// Returns:
+{
+  errors: Ref&lt;Partial&lt;Record&lt;keyof T, string&gt;&gt;&gt;,
+  validate(rules: { [K in keyof T]?: ValidationRule&lt;string&gt;[] }): boolean,
+  setFieldError(field: keyof T, message: string | null): void,
+  clearErrors(): void,
+  setServerErrors(fieldErrors: Record&lt;string, string&gt;): void
+}
+
+// Exported rules object:
+rules.required(label?): ValidationRule&lt;string&gt;
+rules.minLength(min, label?): ValidationRule&lt;string&gt;
+rules.maxLength(max, label?): ValidationRule&lt;string&gt;
+rules.email(): ValidationRule&lt;string&gt;
+rules.matches(other, label?): ValidationRule&lt;string&gt;
+rules.noSpaces(): ValidationRule&lt;string&gt;
+```
+
+Used in PostEditorView for client-side validation, can be combined with server error handling via `setServerErrors()`.
+
+---
+
+### 6. Pinia Stores (`C:\projects\develop_blog\frontend\src\stores\`)
+
+**`auth.ts`** (`useAuthStore()`):
+```typescript
+// State
+accessToken: Ref&lt;string | null&gt;
+refreshToken: Ref&lt;string | null&gt;
+currentUser: Ref&lt;UserResponse | null&gt;
+loading: Ref&lt;boolean&gt;
+
+// Getters
+isAuthenticated: boolean
+isAdmin: boolean
+isUser: boolean
+
+// Actions
+register(data: RegisterRequest): Promise&lt;void&gt;
+login(data: LoginRequest): Promise&lt;void&gt;
+logout(): Promise&lt;void&gt;  // Best-effort server logout, always clears locally
+refresh(): Promise&lt;string&gt;
+loadMe(): Promise&lt;void&gt;
+
+// Init behavior: Auto-loads user if token exists in localStorage
+```
+
+**No dedicated posts store** - State is managed locally in views (refs + reactive objects). Consider creating a `usePosts` store for Content Discovery feature to:
+- Cache post list results
+- Track filters/search state globally
+- Support sidebar/drawer searches
+
+---
+
+### 7. Styling Conventions
+
+**Theme Colors** (Dark GitHub-inspired):
+- Background: `#0D1117` (main), `#161B22` (elevated), `#1C2128` (hover)
+- Borders: `#30363D`
+- Text: `#E6EDF3` (primary), `#8B949E` (secondary)
+- Accents: `#E6A817` (gold), `#3FB950` (success), `#F85149` (error)
+
+**Typography**:
+- Font family: `'JetBrains Mono'` for headers/labels (monospace aesthetic)
+- Font family: `Inter` for body text (sans-serif)
+- Font sizes: `text-xs` through `text-2xl` via Tailwind
+
+**Layout**:
+- Tailwind v4 (via `@tailwindcss/vite`) with `@` alias
+- Responsive: `sm:`, `md:`, `lg:` breakpoints
+- Utility classes: `gap-`, `px-`, `py-`, `mb-`, `flex`, `grid`, `line-clamp-`, `animate-pulse`, `animate-spin`
+- No custom component library; all styling inline with `style=` and Tailwind classes
+
+**Design System**:
+- Sigils: `// comment.syntax` style headers (monospace gold)
+- Cards: Border 1px solid #30363D, background #161B22, hover darkens
+- Buttons: Scoped CSS in AppButton with 4 variants
+- Input focus: Border changes to #E6A817 (gold)
+- Errors: Red (#F85149), inline field errors below labels
+
+---
+
+### 8. Frontend Testing Patterns (`C:\projects\develop_blog\frontend\src\test\`)
+
+**Setup** (`vitest.config` in vite.config.ts):
+```
+environment: jsdom
+globals: true
+setupFiles: ['./src/test/setup.ts']
+```
+
+**Test Structure**:
+- Location: Mirrors source (e.g., `test/api/posts.test.ts` for `api/posts.ts`)
+- Framework: Vitest + Vue Test Utils
+- Mocking: `vi.mock()` for axios, auth, users APIs
+
+**API Test Example** (`posts.test.ts`):
+```typescript
+// Mocks http, auth, users to avoid network
+describe('postsApi', () =&gt; {
+  beforeEach(() =&gt; {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
+  
+  it('calls GET /posts with params', async () =&gt; {
+    const http = await import('@/api/http')
+    http.default.get.mockResolvedValue({ data: mockPage })
+    const { postsApi } = await import('@/api/posts')
+    const result = await postsApi.listPublished({ category: 'vue' })
+    expect(http.default.get).toHaveBeenCalledWith('/posts', { params: { category: 'vue' } })
+  })
+})
+```
+
+**View Test Example** (`MyPostsView.test.ts`):
+```typescript
+// Uses mount() + flushPromises() + router + mocked postsApi
+function createTestRouter() { /* ... */ }
+async function mountMyPosts() {
+  const router = createTestRouter()
+  const wrapper = mount(MyPostsView, { global: { plugins: [router] } })
+  await flushPromises()
+  return { wrapper, router }
+}
+
+it('shows posts returned from listMine', async () =&gt; {
+  const { postsApi } = await import('@/api/posts')
+  ;(postsApi.listMine).mockResolvedValue(mockPage([mockDraftPost]))
+  const { wrapper } = await mountMyPosts()
+  expect(wrapper.text()).toContain('Draft Post')
+})
+```
+
+**Representative Test Files**:
+- `/src/test/api/posts.test.ts` - API call mocking, param validation
+- `/src/test/api/categories.test.ts` - CRUD API tests
+- `/src/test/views/MyPostsView.test.ts` - Component mounting, user interactions, router navigation
+- `/src/test/stores/auth.test.ts` - Store actions and token management
+- `/src/test/components/MarkdownPreview.test.ts` - Rendering markdown content
+- `/src/test/composables/useFormValidation.test.ts` - Validation rule behavior
+- `/src/test/router/guards.test.ts` - Navigation guard behavior
+
+---
+
+### Recommendations for Content Discovery Feature
+
+**1. New Composable**: `usePostDiscovery.ts`
+- Encapsulate search, category filter, sort logic
+- Debounce search (currently inline in PostsListView)
+- Support sorting by date, popularity (future: view count)
+- Reusable across views
+
+**2. New Store**: `usePosts.ts` (optional but recommended)
+- Cache search results
+- Track search history
+- Global search state for drawer/sidebar
+- Pagination context
+
+**3. New Components**:
+- `PostCardSkeleton.vue` - Placeholder for skeleton loading
+- `SearchBar.vue` - Extraction of search input from PostsListView
+- `CategoryFilter.vue` - Extraction of category chips
+- `PaginationControls.vue` - Reusable pagination widget
+- `PopularPostsList.vue` - Most viewed/commented posts sidebar
+
+**4. API Extensions** (backend likely supports already):
+- Add `sortBy` param (date, views, comments)
+- Add `tag` param for tag-based filtering
+- Return view/comment counts in PostSummaryResponse
+- Support full-text search on tags
+
+**5. Styling Considerations**:
+- All CSS is inline `style=` or Tailwind classes
+- Design tokens are hardcoded color strings
+- Consider extracting to CSS variables if expanding significantly
+
+---
+
+### Exact File Paths Summary
+
+**API Layer**:
+- `C:\projects\develop_blog\frontend\src\api\types.ts` - All interfaces
+- `C:\projects\develop_blog\frontend\src\api\posts.ts` - Post endpoints
+- `C:\projects\develop_blog\frontend\src\api\categories.ts` - Category endpoints
+- `C:\projects\develop_blog\frontend\src\api\http.ts` - Axios config + interceptors
+
+**Views**:
+- `C:\projects\develop_blog\frontend\src\views\PostsListView.vue` - Browse/search page (starting point)
+- `C:\projects\develop_blog\frontend\src\views\PostDetailView.vue` - Single post view
+- `C:\projects\develop_blog\frontend\src\views\MyPostsView.vue` - User's posts with status filter
+- `C:\projects\develop_blog\frontend\src\views\PostEditorView.vue` - Create/edit
+
+**Router**:
+- `C:\projects\develop_blog\frontend\src\router\index.ts`
+
+**Components**:
+- `C:\projects\develop_blog\frontend\src\components\PostCard.vue` - Reuse for content cards
+- `C:\projects\develop_blog\frontend\src\components\CategorySelect.vue` - Category picker
+- `C:\projects\develop_blog\frontend\src\components\AppButton.vue`, `AppInput.vue`, `FormField.vue` - Primitives
+- `C:\projects\develop_blog\frontend\src\components\AlertMessage.vue` - Error/success messages
+
+**Stores &amp; Composables**:
+- `C:\projects\develop_blog\frontend\src\stores\auth.ts`
+- `C:\projects\develop_blog\frontend\src\composables\useFormValidation.ts`
+
+**Tests**:
+- `C:\projects\develop_blog\frontend\src\test\api\posts.test.ts`
+- `C:\projects\develop_blog\frontend\src\test\views\MyPostsView.test.ts`
+
+This architecture is well-structured for extending the Content Discovery feature with minimal refactoring.</result>
+<usage><subagent_tokens>52133</subagent_tokens><tool_uses>38</tool_uses><duration_ms>82572</duration_ms></usage>
+</task-notification>
+
+[2026-06-20T16:22:36] (session ddb8db21)
+<task-notification>
+<task-id>a8dd9a557c86d4c00</task-id>
+<tool-use-id>toolu_01QrZngAzWZYvrsxxkYjyVDp</tool-use-id>
+<output-file>C:\Users\ivan_\AppData\Local\Temp\claude\C--projects-develop-blog\ddb8db21-0bb7-4d3a-ba7a-96d8933178df\tasks\a8dd9a557c86d4c00.output</output-file>
+<status>completed</status>
+<summary>Agent "Explore backend posts/categories" came to rest</summary>
+<note>A task-notification fires each time this agent comes to rest with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Excellent! Now I have all the information needed. Let me compile the comprehensive report.
+
+## Content Discovery Feature - Spring Boot Backend Analysis
+
+Based on my thorough exploration of the codebase, here's the complete structure and implementation details:
+
+---
+
+### 1. **Post Entity - Complete Field List**
+
+**File Path:** `C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\entity\Post.java`
+
+**Fields:**
+- `id` (Long) - Primary key, auto-generated
+- `title` (String, 255 chars, NOT NULL) - Post title
+- `slug` (String, 300 chars, UNIQUE, NOT NULL) - URL-friendly identifier
+- `contentMarkdown` (String, TEXT, NOT NULL) - Main content in markdown format
+- `excerpt` (String, 300 chars, nullable) - Brief summary
+- `status` (PostStatus enum, NOT NULL, default: DRAFT) - DRAFT or PUBLISHED
+- `author` (User, ManyToOne, LAZY, NOT NULL) - Foreign key to author
+- `category` (Category, ManyToOne, LAZY, nullable) - Foreign key to category
+- `publishedAt` (Instant, nullable) - When published (set at publish time)
+- `createdAt` (Instant, NOT NULL, immutable) - Creation timestamp
+- `updatedAt` (Instant, NOT NULL) - Last update timestamp
+- `version` (Long) - Optimistic locking version field
+
+**Indexes:** slug, status, author_id (for query optimization)
+
+---
+
+### 2. **Category Entity &amp; Tag Handling**
+
+**File Path:** `C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\entity\Category.java`
+
+**Category Fields:**
+- `id` (Long) - Primary key
+- `name` (String, 100 chars, UNIQUE, NOT NULL)
+- `slug` (String, 120 chars, UNIQUE, NOT NULL)
+- `description` (String, TEXT, nullable)
+- `createdAt` / `updatedAt` (Instant)
+- **Index:** slug
+
+**Key Finding:** There is **NO Tag entity** in the current implementation. Posts have:
+- A single **ManyToOne relationship to Category** (required for published posts)
+- **NO tags collection** on Post entity
+- **"Technology" is represented via Category**, not a separate concept
+
+**Seeded Categories** (via DataInitializer):
+- Java
+- Spring
+- Vue
+- DevOps
+
+---
+
+### 3. **PostController - Existing Endpoints**
+
+**File Path:** `C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\controller\PostController.java`
+
+**Request Mapping Base:** `/api/posts`
+
+| Method | Endpoint | Auth | Query Params | Returns | Purpose |
+|--------|----------|------|--------------|---------|---------|
+| GET | `/api/posts` | Public | `category` (slug), `search` (text), `Pageable` (size=20 default) | `Page&lt;PostSummaryResponse&gt;` | List published posts, filter by category/search |
+| GET | `/api/posts/{slug}` | Public | - | `PostResponse` | Get published post by slug (404 if draft) |
+| POST | `/api/posts` | USER role | - | `PostResponse` | Create new post (ADMIN forbidden) |
+| PUT | `/api/posts/{id}` | Authenticated (owner/admin) | - | `PostResponse` | Update post details |
+| PUT | `/api/posts/{id}/status` | Authenticated | - | `PostResponse` | Publish/un-publish post |
+| DELETE | `/api/posts/{id}` | Authenticated | - | 204 No Content | Delete post |
+| GET | `/api/posts/mine` | USER role | `status` (POST enum, optional), `Pageable` | `Page&lt;PostSummaryResponse&gt;` | List user's own posts with status filter |
+| GET | `/api/posts/mine/{id}` | Authenticated | - | `PostResponse` | Get own post details |
+
+**Pagination Support:** Yes, uses Spring's `@PageableDefault(size = 20)` and `Pageable` parameter.
+
+---
+
+### 4. **PostService &amp; PostRepository - Key Methods**
+
+**File Path:** `C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\service\PostService.java`
+
+**Service Interface Methods:**
+```java
+PostResponse create(String authorUsername, CreatePostRequest request)
+PostResponse update(Long id, UserDetails principal, UpdatePostRequest request)
+PostResponse changeStatus(Long id, UserDetails principal, UpdatePostStatusRequest request)
+void delete(Long id, UserDetails principal)
+PostResponse getPublishedBySlug(String slug)
+Page&lt;PostSummaryResponse&gt; listPublished(String categorySlug, String search, Pageable pageable)
+PostResponse getOwn(Long id, UserDetails principal)
+Page&lt;PostSummaryResponse&gt; listOwn(UserDetails principal, PostStatus status, Pageable pageable)
+```
+
+**File Path:** `C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\service\impl\PostServiceImpl.java`
+
+**Key Implementation Details:**
+- Uses `Specification&lt;Post&gt;` for dynamic filtering (Criteria API)
+- `buildPublishedSpec()` - Filters by status=PUBLISHED, category slug, and title search (case-insensitive LIKE)
+- `buildOwnSpec()` - Filters posts by author username and optional status
+- Slug generation via `Slugs.uniqueSlug()` with collision detection
+- Publishes require a category; setting publishedAt on first publish
+- Admin cannot author posts (throws ForbiddenOperationException)
+
+**File Path:** `C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\repository\PostRepository.java`
+
+**Repository Query Methods:**
+```java
+Optional&lt;Post&gt; findBySlug(String slug)  // JOIN FETCH author, category
+Optional&lt;Post&gt; findBySlugAndStatus(String slug, PostStatus status)  // JOIN FETCH
+Optional&lt;Post&gt; findByIdWithAuthorAndCategory(Long id)  // JOIN FETCH
+boolean existsBySlug(String slug)
+boolean existsByCategory(Category category)
+```
+
+**Filtering Capability:**
+- **Search:** Case-insensitive title search via Specification
+- **By Category:** Via `categorySlug` parameter (INNER JOIN filter)
+- **By Status:** Direct enum filter (PUBLISHED vs DRAFT)
+- **By Author:** Username filter
+- **Ordering:** Not explicitly configured (default DB order), no sortBy param exposed yet
+
+---
+
+### 5. **Post DTOs &amp; Mapper**
+
+**PostResponse** (`C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\dto\PostResponse.java`):
+```java
+Long id, String slug, String title, String excerpt, 
+PostStatus status, CategoryResponse category, AuthorSummary author,
+Instant publishedAt, Instant createdAt, String contentMarkdown, Instant updatedAt
+```
+
+**PostSummaryResponse** (`C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\dto\PostSummaryResponse.java`):
+```java
+Long id, String slug, String title, String excerpt,
+PostStatus status, CategoryResponse category, AuthorSummary author,
+Instant publishedAt, Instant createdAt
+// Note: excludes contentMarkdown
+```
+
+**CreatePostRequest:**
+```java
+String title (required), String contentMarkdown (required), 
+String excerpt, Long categoryId, PostStatus status
+```
+
+**UpdatePostRequest:**
+```java
+String title (required), String contentMarkdown (required),
+String excerpt, Long categoryId
+// Note: slug never changes
+```
+
+**UpdatePostStatusRequest:**
+```java
+PostStatus status (required)
+```
+
+**CategoryResponse:**
+```java
+Long id, String name, String slug, String description
+```
+
+**AuthorSummary:**
+```java
+Long id, String username, String displayName
+```
+
+**File Path:** `C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\mapper\PostMapper.java`
+
+**Mapper Methods:**
+- `toResponse(Post)` - Full post with markdown content
+- `toSummary(Post)` - Summary without markdown (for list views)
+
+---
+
+### 6. **DataInitializer &amp; Seeding Configuration**
+
+**File Path:** `C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\config\DataInitializer.java`
+
+**Initialization Process:**
+1. Creates roles: ADMIN and USER (idempotent via `ensureRole()`)
+2. Seeded admin user (with both ADMIN and USER roles)
+3. Seeded default user (with USER role only)
+4. Four starter categories if none exist: Java, Spring, Vue, DevOps
+
+**Default User Credentials** (from `application.yaml`):
+
+**Admin:**
+- Username: `admin` (env: `SEED_ADMIN_USERNAME`)
+- Email: `admin@devblog.local` (env: `SEED_ADMIN_EMAIL`)
+- Password: `Admin@1234` (env: `SEED_ADMIN_PASSWORD`)
+
+**User:**
+- Username: `user` (env: `SEED_USER_USERNAME`)
+- Email: `user@devblog.local` (env: `SEED_USER_EMAIL`)
+- Password: `User@1234` (env: `SEED_USER_PASSWORD`)
+
+**AppProperties Config File:** `C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\config\AppProperties.java`
+- Properties bound to `app.seed.admin.*` and `app.seed.user.*` from YAML
+
+---
+
+### 7. **Popularity/View Tracking**
+
+**Key Finding:** **There is NO viewCount field or view-tracking mechanism currently implemented.**
+
+The Post entity does not have:
+- `viewCount` field
+- `favoriteCount` / `likeCount`
+- View/engagement tracking tables
+- Any read-only statistics
+
+**To Implement Popularity:** Would need to add:
+- Long `viewCount` field to Post entity (default 0, increment on public GET)
+- Consider View event table for analytics (id, post_id, viewer_ip, viewed_at)
+- Sort parameter on `listPublished()` to order by viewCount DESC
+
+---
+
+### 8. **Existing Backend Test Patterns**
+
+**Test Style:** Combination of unit tests (Mockito), slice tests (@WebMvcTest), and integration tests (@SpringBootTest)
+
+**Controller Slice Tests**
+- **File:** `C:\projects\develop_blog\backend\devblog\devblog\src\test\java\met\ivan\devblog\controller\PostControllerTest.java`
+- **Annotation:** `@WebMvcTest(controllers = {PostController.class, GlobalExceptionHandler.class})`
+- **Imports:** `SecurityConfig.class, JwtAuthenticationFilter.class, AppProperties.class`
+- **Mocking:** `@MockitoBean` for PostService, JwtService, CustomUserDetailsService
+- **Testing:** HTTP status codes, response JSON structure, auth checks
+- **Example:** Tests for 200, 201, 401, 403, 404 scenarios with `@WithMockUser` annotation
+
+**Service Unit Tests**
+- **File:** `C:\projects\develop_blog\backend\devblog\devblog\src\test\java\met\ivan\devblog\service\PostServiceImplTest.java`
+- **Annotation:** `@ExtendWith(MockitoExtension.class)`
+- **Mocking:** `@Mock` repositories, `@InjectMocks` service
+- **Testing:** Business logic (slug generation, authorization, status transitions)
+- **Assertions:** AssertJ fluent API (`assertThat(...).isEqualTo(...)`)
+
+**Repository JPA Tests**
+- **File:** `C:\projects\develop_blog\backend\devblog\devblog\src\test\java\met\ivan\devblog\repository\PostRepositoryTest.java`
+- **Annotation:** `@DataJpaTest` with TestEntityManager
+- **Testing:** Query correctness, JOIN FETCH loading, Specification filtering
+- **Setup:** Manual entity persistence in `@BeforeEach`
+
+**Integration Tests (End-to-End)**
+- **File:** `C:\projects\develop_blog\backend\devblog\devblog\src\test\java\met\ivan\devblog\integration\BlogPostManagementIntegrationTest.java`
+- **Annotation:** `@SpringBootTest(webEnvironment = RANDOM_PORT)`
+- **Testing:** Full HTTP workflows (create draft → publish → fetch publicly)
+- **Client:** `TestRestTemplate` with bearer token authentication
+- **Setup:** Uses seeded data (categories via DataInitializer)
+
+**Test Data Factory**
+- **File:** `C:\projects\develop_blog\backend\devblog\devblog\src\test\java\met\ivan\devblog\TestDataFactory.java`
+- **Purpose:** Provides reusable builder methods: `userRole()`, `adminUser()`, `category()`, `draftPost()`, `publishedPost()`
+
+**Test Configuration**
+- **Profile:** `@ActiveProfiles("test")`
+- **Test YAML:** `application-test.yaml` with SQLite in-memory DB
+
+---
+
+### Summary Table: Content Discovery Readiness
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Browse by Category | ✅ Implemented | `GET /api/posts?category=slug` with pagination |
+| Search by Title | ✅ Implemented | `GET /api/posts?search=text` (case-insensitive LIKE) |
+| Search by Content | ❌ Not Implemented | Only title search available |
+| Search by Tags | ❌ Not Applicable | No Tag entity exists |
+| Latest Articles | ✅ Implementable | Need to add `sort=createdAt,desc` to `Pageable` |
+| Most Popular | ❌ Not Implemented | No viewCount field; would need to add + tracking |
+| Filter by Technology | ✅ Implemented as Category | Categories: Java, Spring, Vue, DevOps |
+| Pagination | ✅ Implemented | Page size 20 default, customizable |
+| Status Filtering | ✅ Implemented | `GET /api/posts/mine?status=DRAFT` (own posts only) |
+
+---
+
+### Files Reference Summary
+
+**Entities:**
+- Post: `src/main/java/met/ivan/devblog/entity/Post.java`
+- Category: `src/main/java/met/ivan/devblog/entity/Category.java`
+- PostStatus: `src/main/java/met/ivan/devblog/entity/PostStatus.java`
+- User/Role: `src/main/java/met/ivan/devblog/entity/{User, Role, RoleName}.java`
+
+**Controllers:**
+- `src/main/java/met/ivan/devblog/controller/PostController.java`
+
+**Services:**
+- Interface: `src/main/java/met/ivan/devblog/service/PostService.java`
+- Implementation: `src/main/java/met/ivan/devblog/service/impl/PostServiceImpl.java`
+
+**Repositories:**
+- `src/main/java/met/ivan/devblog/repository/PostRepository.java`
+- `src/main/java/met/ivan/devblog/repository/CategoryRepository.java`
+
+**DTOs &amp; Mappers:**
+- `src/main/java/met/ivan/devblog/dto/{PostResponse, PostSummaryResponse, CreatePostRequest, UpdatePostRequest}.java`
+- `src/main/java/met/ivan/devblog/mapper/{PostMapper, CategoryMapper}.java`
+
+**Config:**
+- DataInitializer: `src/main/java/met/ivan/devblog/config/DataInitializer.java`
+- AppProperties: `src/main/java/met/ivan/devblog/config/AppProperties.java`
+- application.yaml: `src/main/resources/application.yaml`
+
+**Tests:**
+- Controller: `src/test/java/met/ivan/devblog/controller/PostControllerTest.java`
+- Service: `src/test/java/met/ivan/devblog/service/PostServiceImplTest.java`
+- Repository: `src/test/java/met/ivan/devblog/repository/PostRepositoryTest.java`
+- Integration: `src/test/java/met/ivan/devblog/integration/BlogPostManagementIntegrationTest.java`
+- Test Factory: `src/test/java/met/ivan/devblog/TestDataFactory.java`</result>
+<usage><subagent_tokens>44072</subagent_tokens><tool_uses>43</tool_uses><duration_ms>96995</duration_ms></usage>
+</task-notification>
+
+[2026-06-20T16:43:08] (session ddb8db21)
+checkout new branch and commit plan
+
+[2026-06-20T16:44:43] (session be35ea37)
+execute plan @docs/plans/content-discovery.md
+
+[2026-06-20T16:52:42] (session be35ea37)
+<task-notification>
+<task-id>a71b859486add33d6</task-id>
+<tool-use-id>toolu_01HvU5GQFaV4GnEuv8mELH6b</tool-use-id>
+<output-file>C:\Users\ivan_\AppData\Local\Temp\claude\C--projects-develop-blog\be35ea37-a87e-4170-8947-308b75f9049a\tasks\a71b859486add33d6.output</output-file>
+<status>completed</status>
+<summary>Agent "Implement content discovery frontend" came to rest</summary>
+<note>A task-notification fires each time this agent comes to rest with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Everything looks correct. Now please run the following from the `frontend/` directory to verify:
+
+```
+npm test -- --run
+npm run lint
+```
+
+Here is a summary of every file changed and what was done:
+
+---
+
+**Files changed**
+
+`C:\projects\develop_blog\frontend\src\api\types.ts`
+- Added `tags: string[]` and `viewCount: number` to `PostSummaryResponse` (inherited by `PostResponse` via extension).
+- Added `tags?: string[]` to `CreatePostRequest` and `UpdatePostRequest`.
+
+`C:\projects\develop_blog\frontend\src\api\posts.ts`
+- Added `sort?: 'latest' | 'popular'` to the `listPublished` params type; it is forwarded to the axios `{ params }` object automatically.
+
+`C:\projects\develop_blog\frontend\src\components\PostCard.vue`
+- Added `tagClick: [tag: string]` emit.
+- Renders `tags` as blue-tinted chips (`#79C0FF` on `rgba(56,139,253,0.08)` background) using Inter, not Mono — semantically distinct from the gold Mono category chip.
+- Clicking a tag chip emits `tagClick` with `.prevent.stop` to avoid navigating via the wrapping `RouterLink`.
+- Renders `viewCount` via a `formatViewCount` helper (shows `1.3k` for 1250, `1k` for 1000, raw number otherwise) alongside an SVG eye icon with `aria-label`.
+
+`C:\projects\develop_blog\frontend\src\views\PostsListView.vue`
+- Added `sortMode` ref (`'latest' | 'popular'`, default `'latest'`).
+- Added `setSortMode` function that resets to page 0 and refetches.
+- Passes `sort: sortMode.value` into every `listPublished` call.
+- Added a segmented sort toggle ("Latest" / "Most Popular") styled to match the category chip active state (gold fill when active, `#8B949E` inactive).
+- Added `handleTagClick` that writes the tag into `searchQuery`, triggering the existing debounced re-fetch.
+- Listens to `@tag-click` from `PostCard` and calls `handleTagClick`.
+- Relabelled the category chip section with a `Technology` label.
+- Updated search placeholder to `"Search posts, tags…"`.
+
+`C:\projects\develop_blog\frontend\src\views\PostEditorView.vue`
+- Added `tagsInput: ''` to the `form` reactive object.
+- Added `parseTags()` helper: splits on commas/newlines, trims, lowercases, deduplicates via `Set`.
+- On `onMounted` (edit mode), pre-fills `form.tagsInput` from `p.tags.join(', ')`.
+- Both `saveDraft` and `publish` now include `tags: parseTags()` in the `create`/`update` payload.
+- Added a `FormField`/`AppInput` for `tagsInput` below the excerpt field, matching existing editor styling with the hint `"Optional — comma-separated (e.g. jwt, spring-security)"`.
+
+**Tests created/modified**
+
+`C:\projects\develop_blog\frontend\src\test\api\posts.test.ts`
+- Added `tags` and `viewCount` to `mockPost`.
+- Added 3 new `listPublished` tests: forwards `sort=popular`, `sort=latest`, and all three params combined.
+
+`C:\projects\develop_blog\frontend\src\test\components\PostCard.test.ts` (new)
+- Tests `viewCount` rendering: raw number, k-format, 0, exactly 1k.
+- Tests `tags` chips: all tags rendered, empty array produces no chips, `tagClick` emits correct tag value.
+- Tests existing card content: title, category, author, excerpt, link href.
+
+`C:\projects\develop_blog\frontend\src\test\views\PostsListView.test.ts` (new)
+- Tests sort toggle renders, defaults to `latest`, switches to `popular`, resets page to 0.
+- Tests tag chip click sets `searchQuery` and eventually triggers search with the tag value (via fake timers for the debounce).
+- Tests category filter: Technology label, Java chip refetches with `category: 'java'`, All chip clears it.
+- Tests posts display and empty state.
+
+`C:\projects\develop_blog\frontend\src\test\views\PostEditorView.test.ts`
+- Added `tags` and `viewCount` to `mockPost` to satisfy the updated `PostSummaryResponse` type.
+- Added 5 new tests under `'tags input'`: input field renders; comma-separated value serializes to `string[]`; trims/lowercases; empty input sends `[]`; pre-fills from existing post; update payload includes tags.
+
+`C:\projects\develop_blog\frontend\src\test\views\MyPostsView.test.ts`
+- Added `tags: [] as string[]` and `viewCount` to `mockDraftPost` and `mockPublishedPost` so they satisfy the updated `PostSummaryResponse` type (required to avoid TypeScript errors in strict mode).</result>
+<usage><subagent_tokens>72603</subagent_tokens><tool_uses>46</tool_uses><duration_ms>433050</duration_ms></usage>
+</task-notification>
+
+[2026-06-20T16:55:29] (session be35ea37)
+<task-notification>
+<task-id>a66d7195d9c13dfeb</task-id>
+<tool-use-id>toolu_01LrrTQu8j3EDceMpzg1LDDD</tool-use-id>
+<output-file>C:\Users\ivan_\AppData\Local\Temp\claude\C--projects-develop-blog\be35ea37-a87e-4170-8947-308b75f9049a\tasks\a66d7195d9c13dfeb.output</output-file>
+<status>completed</status>
+<summary>Agent "Implement content discovery backend" came to rest</summary>
+<note>A task-notification fires each time this agent comes to rest with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>I need to stop here and report what has been done, since I cannot run the tests or reduce permission prompts without user authorization.
+
+---
+
+Here is a concise summary of everything implemented and the current state.
+
+## Files Changed
+
+**Entity:**
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/entity/Post.java` — Added `@ElementCollection` `tags` (`Set&lt;String&gt;`, table `post_tags`) and `viewCount` (`Long`, default 0). Both use `@Builder.Default`.
+
+**DTOs:**
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/dto/PostSummaryResponse.java` — Added `Set&lt;String&gt; tags` and `Long viewCount` fields.
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/dto/PostResponse.java` — Added `Set&lt;String&gt; tags` and `Long viewCount` fields.
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/dto/CreatePostRequest.java` — Added optional `Set&lt;@Size(max=50) String&gt; tags` with `@Size(max=10)` collection cap.
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/dto/UpdatePostRequest.java` — Same as above.
+
+**Mapper:**
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/mapper/PostMapper.java` — `toResponse` and `toSummary` both now map `post.getTags()` and `post.getViewCount()`.
+
+**Repository:**
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/repository/PostRepository.java` — Added `@Modifying @Query` `incrementViewCount(Long id)`.
+
+**Service interface:**
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/service/PostService.java` — `listPublished` now takes `String sort` as third parameter.
+
+**Service impl:**
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/service/impl/PostServiceImpl.java` — Broadened `buildPublishedSpec` to OR across `title`, `contentMarkdown`, and `tags` join with `query.distinct(true)`. Added `resolveSort` helper (LATEST → `publishedAt DESC`, POPULAR → `viewCount DESC, publishedAt DESC`) applied via `PageRequest.of` override. Added `normalizeTags` (trim + lowercase + blank-drop) applied in `create` and `update`. `getPublishedBySlug` calls `incrementViewCount` then bumps the in-memory count before mapping (explicit `@Transactional` replaces the removed `readOnly = true`).
+
+**Controller:**
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/controller/PostController.java` — `listPublished` accepts `@RequestParam(required = false) String sort` and passes it through.
+
+**DataInitializer:**
+- `/backend/devblog/devblog/src/main/java/met/ivan/devblog/config/DataInitializer.java` — Injects `PostRepository`; after categories are seeded, calls `seedPosts` guarded by `postRepository.count() == 0`. Seeds 12 PUBLISHED posts spread across Java/Spring/Vue/DevOps categories, each with 2–4 tags, staggered `publishedAt` (1–30 days ago), and varied `viewCount` (90–8500) so LATEST and POPULAR orderings visibly differ.
+
+**Tests:**
+- `/backend/devblog/devblog/src/test/java/met/ivan/devblog/TestDataFactory.java` — `draftPost` and `publishedPost` now set `tags` and `viewCount` on builders; added overload `publishedPost(author, category, tags, viewCount)`.
+- `/backend/devblog/devblog/src/test/java/met/ivan/devblog/repository/PostRepositoryTest.java` — New tests: content search, tag search (with element-collection join), `incrementViewCount`, POPULAR sort order, LATEST sort order.
+- `/backend/devblog/devblog/src/test/java/met/ivan/devblog/service/PostServiceImplTest.java` — All constructor calls updated; new tests: tag normalization on create/update, `getPublishedBySlug` calls `incrementViewCount` and returns bumped count, `listPublished` builds correct `Sort` for `latest`/`popular`/null.
+- `/backend/devblog/devblog/src/test/java/met/ivan/devblog/controller/PostControllerTest.java` — All constructor calls updated; new tests: `?sort=popular` passes sort param to service, response JSON includes `tags` and `viewCount`.
+- `/backend/devblog/devblog/src/test/java/met/ivan/devblog/integration/BlogPostManagementIntegrationTest.java` — All constructor calls updated; new tests: seeded posts exist authored by `user`, `sort=popular` returns highest-viewed first, `sort=latest` vs `sort=popular` differ, search by content word returns match, search by tag returns match, public GET bumps `viewCount`.
+
+## Test Run Required
+
+I was unable to run `mvnw.cmd test` because Bash permission was denied. Please run:
+
+```
+cd backend\devblog\devblog
+mvnw.cmd test
+```
+
+If any test fails, share the output and I will diagnose and fix immediately.</result>
+<usage><subagent_tokens>93325</subagent_tokens><tool_uses>60</tool_uses><duration_ms>611940</duration_ms></usage>
+</task-notification>
+
+[2026-06-20T17:09:03] (session be35ea37)
+commit and push changes
+

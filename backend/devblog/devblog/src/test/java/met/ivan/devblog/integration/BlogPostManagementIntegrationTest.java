@@ -9,6 +9,8 @@ import met.ivan.devblog.dto.UpdatePostStatusRequest;
 import met.ivan.devblog.entity.PostStatus;
 import met.ivan.devblog.repository.CategoryRepository;
 import met.ivan.devblog.repository.PostRepository;
+
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -90,6 +92,129 @@ class BlogPostManagementIntegrationTest {
         assertThat(categoryRepository.existsBySlug("devops")).isTrue();
     }
 
+    @Test
+    @DisplayName("Seeded posts exist and are authored by default user")
+    void seededPostsExist_authoredByDefaultUser() {
+        // DataInitializer seeds 12 posts for the default user
+        assertThat(postRepository.count()).isGreaterThanOrEqualTo(12);
+
+        ResponseEntity<String> postsResp = restTemplate.getForEntity(
+                baseUrl() + "/api/posts", String.class);
+        assertThat(postsResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        // All seeded posts should have author username "user"
+        long userPosts = postRepository.countByAuthorUsername("user");
+        assertThat(userPosts).isGreaterThanOrEqualTo(12);
+    }
+
+    // --- Sort ordering ---
+
+    @Test
+    @DisplayName("sort=popular returns highest viewCount post first")
+    void sort_popular_highestViewCountFirst() {
+        ResponseEntity<String> resp = restTemplate.getForEntity(
+                baseUrl() + "/api/posts?sort=popular", String.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        // The response body should contain viewCount fields
+        assertThat(resp.getBody()).contains("viewCount");
+
+        // Find max viewCount post slug
+        long maxViewCount = postRepository.findAll().stream()
+                .filter(p -> p.getStatus() == PostStatus.PUBLISHED)
+                .mapToLong(p -> p.getViewCount())
+                .max().orElse(0L);
+
+        String maxSlug = postRepository.findAll().stream()
+                .filter(p -> p.getStatus() == PostStatus.PUBLISHED && p.getViewCount() == maxViewCount)
+                .map(p -> p.getSlug())
+                .findFirst().orElse(null);
+
+        assertThat(maxSlug).isNotNull();
+        // The first result in popular should be the highest-viewed post
+        int maxSlugIndex = resp.getBody().indexOf(maxSlug);
+        // Should appear early in the JSON (within the first 2000 chars)
+        assertThat(maxSlugIndex).isGreaterThanOrEqualTo(0).isLessThan(2000);
+    }
+
+    @Test
+    @DisplayName("sort=latest and sort=popular produce different orderings for seed data")
+    void sort_latestAndPopular_differForSeedData() {
+        ResponseEntity<String> latestResp = restTemplate.getForEntity(
+                baseUrl() + "/api/posts?sort=latest&size=12", String.class);
+        ResponseEntity<String> popularResp = restTemplate.getForEntity(
+                baseUrl() + "/api/posts?sort=popular&size=12", String.class);
+
+        assertThat(latestResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(popularResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        // The two responses should be different (seed data has varied viewCounts)
+        assertThat(latestResp.getBody()).isNotEqualTo(popularResp.getBody());
+    }
+
+    // --- Search by content and tag ---
+
+    @Test
+    @DisplayName("search by content word returns matching posts")
+    void search_byContentWord_returnsMatch() {
+        // "virtual threads" appears in the contentMarkdown of one seed post
+        ResponseEntity<String> resp = restTemplate.getForEntity(
+                baseUrl() + "/api/posts?search=virtual+threads", String.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getBody()).contains("virtual-threads");
+    }
+
+    @Test
+    @DisplayName("search by tag returns matching posts")
+    void search_byTag_returnsMatch() {
+        // "jwt" is a tag on the Spring Security seed post
+        ResponseEntity<String> resp = restTemplate.getForEntity(
+                baseUrl() + "/api/posts?search=jwt", String.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        // Should contain the Spring Security JWT post
+        assertThat(resp.getBody()).isNotEmpty();
+        // The content array should be non-empty
+        assertThat(resp.getBody()).contains("\"totalElements\":");
+        // totalElements should be >= 1
+        assertThat(resp.getBody()).doesNotContain("\"totalElements\":0");
+    }
+
+    // --- viewCount increment on public GET ---
+
+    @Test
+    @DisplayName("Public GET /api/posts/{slug} bumps viewCount each call")
+    void publicGet_bySlug_bumpsViewCount() {
+        // Pick the first published post from seed data
+        String slug = postRepository.findAll().stream()
+                .filter(p -> p.getStatus() == PostStatus.PUBLISHED)
+                .map(p -> p.getSlug())
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("No published posts in seed data"));
+
+        long viewsBefore = postRepository.findAll().stream()
+                .filter(p -> p.getSlug().equals(slug))
+                .mapToLong(p -> p.getViewCount())
+                .findFirst().orElse(0L);
+
+        // First GET
+        ResponseEntity<PostResponse> resp1 = restTemplate.getForEntity(
+                baseUrl() + "/api/posts/" + slug, PostResponse.class);
+        assertThat(resp1.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        // Second GET
+        ResponseEntity<PostResponse> resp2 = restTemplate.getForEntity(
+                baseUrl() + "/api/posts/" + slug, PostResponse.class);
+        assertThat(resp2.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        // Check DB
+        long viewsAfter = postRepository.findAll().stream()
+                .filter(p -> p.getSlug().equals(slug))
+                .mapToLong(p -> p.getViewCount())
+                .findFirst().orElse(0L);
+
+        assertThat(viewsAfter).isGreaterThanOrEqualTo(viewsBefore + 2);
+    }
+
     // --- Full post lifecycle ---
 
     @Test
@@ -99,7 +224,7 @@ class BlogPostManagementIntegrationTest {
 
         // 1. Create a draft post
         CreatePostRequest createReq = new CreatePostRequest(
-                "Integration Test Post", "# Hello World", "A test excerpt", null, PostStatus.DRAFT);
+                "Integration Test Post", "# Hello World", "A test excerpt", null, PostStatus.DRAFT, null);
         ResponseEntity<PostResponse> createResp = restTemplate.exchange(
                 baseUrl() + "/api/posts",
                 HttpMethod.POST,
@@ -130,7 +255,7 @@ class BlogPostManagementIntegrationTest {
 
         // 4. Publish the post (assign category first via update)
         UpdatePostRequest updateReq = new UpdatePostRequest(
-                "Integration Test Post", "# Hello World", "A test excerpt", seededCategoryId);
+                "Integration Test Post", "# Hello World", "A test excerpt", seededCategoryId, null);
         restTemplate.exchange(
                 baseUrl() + "/api/posts/" + postId,
                 HttpMethod.PUT,
@@ -167,7 +292,7 @@ class BlogPostManagementIntegrationTest {
 
         // Create post as 'user'
         CreatePostRequest createReq = new CreatePostRequest(
-                "User1 Post", "# Content", null, null, PostStatus.DRAFT);
+                "User1 Post", "# Content", null, null, PostStatus.DRAFT, null);
         ResponseEntity<PostResponse> createResp = restTemplate.exchange(
                 baseUrl() + "/api/posts",
                 HttpMethod.POST,
@@ -185,7 +310,7 @@ class BlogPostManagementIntegrationTest {
         String token2 = reg2Resp.getBody().getAccessToken();
 
         // Attempt edit as second user
-        UpdatePostRequest updateReq = new UpdatePostRequest("Hacked Title", "Hacked", null, null);
+        UpdatePostRequest updateReq = new UpdatePostRequest("Hacked Title", "Hacked", null, null, null);
         ResponseEntity<String> editResp = restTemplate.exchange(
                 baseUrl() + "/api/posts/" + postId,
                 HttpMethod.PUT,
@@ -202,7 +327,7 @@ class BlogPostManagementIntegrationTest {
 
         // Create post as user and publish it
         CreatePostRequest createReq = new CreatePostRequest(
-                "Admin Target Post", "# Content", "excerpt", seededCategoryId, PostStatus.PUBLISHED);
+                "Admin Target Post", "# Content", "excerpt", seededCategoryId, PostStatus.PUBLISHED, Set.of("java"));
         ResponseEntity<PostResponse> createResp = restTemplate.exchange(
                 baseUrl() + "/api/posts",
                 HttpMethod.POST,
@@ -213,7 +338,7 @@ class BlogPostManagementIntegrationTest {
         String slug = createResp.getBody().getSlug();
 
         // Admin edits the post
-        UpdatePostRequest editReq = new UpdatePostRequest("Admin Edited Title", "# Edited", null, seededCategoryId);
+        UpdatePostRequest editReq = new UpdatePostRequest("Admin Edited Title", "# Edited", null, seededCategoryId, null);
         ResponseEntity<PostResponse> editResp = restTemplate.exchange(
                 baseUrl() + "/api/posts/" + postId,
                 HttpMethod.PUT,
@@ -249,7 +374,7 @@ class BlogPostManagementIntegrationTest {
     void admin_cannotCreatePost() {
         String adminToken = loginToken("admin", "Admin@1234");
 
-        CreatePostRequest req = new CreatePostRequest("Admin Post", "Content", null, null, PostStatus.DRAFT);
+        CreatePostRequest req = new CreatePostRequest("Admin Post", "Content", null, null, PostStatus.DRAFT, null);
         ResponseEntity<String> resp = restTemplate.exchange(
                 baseUrl() + "/api/posts",
                 HttpMethod.POST,
@@ -266,7 +391,7 @@ class BlogPostManagementIntegrationTest {
 
         // Create a post that references the seeded Java category
         CreatePostRequest createReq = new CreatePostRequest(
-                "Cat Block Test Post", "# Content", null, seededCategoryId, PostStatus.DRAFT);
+                "Cat Block Test Post", "# Content", null, seededCategoryId, PostStatus.DRAFT, null);
         restTemplate.exchange(
                 baseUrl() + "/api/posts",
                 HttpMethod.POST,

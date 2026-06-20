@@ -6,6 +6,7 @@ import lombok.Getter;
 import met.ivan.devblog.entity.PostStatus;
 
 import java.time.Instant;
+import java.util.Set;
 
 @Getter
 @AllArgsConstructor
@@ -22,4 +23,6 @@ public class PostResponse {
     private final Instant createdAt;
     private final String contentMarkdown;
     private final Instant updatedAt;
+    private final Set<String> tags;
+    private final Long viewCount;
 }

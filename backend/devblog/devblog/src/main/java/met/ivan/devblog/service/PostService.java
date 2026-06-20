@@ -22,7 +22,7 @@ public interface PostService {
 
     PostResponse getPublishedBySlug(String slug);
 
-    Page<PostSummaryResponse> listPublished(String categorySlug, String search, Pageable pageable);
+    Page<PostSummaryResponse> listPublished(String categorySlug, String search, String sort, Pageable pageable);
 
     PostResponse getOwn(Long id, UserDetails principal);
 

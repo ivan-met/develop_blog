@@ -7,6 +7,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import met.ivan.devblog.entity.PostStatus;
 
+import java.util.Set;
+
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
@@ -25,4 +27,7 @@ public class CreatePostRequest {
     private Long categoryId;
 
     private PostStatus status;
+
+    @Size(max = 10, message = "A post may have at most 10 tags")
+    private Set<@Size(max = 50, message = "Each tag must not exceed 50 characters") String> tags;
 }

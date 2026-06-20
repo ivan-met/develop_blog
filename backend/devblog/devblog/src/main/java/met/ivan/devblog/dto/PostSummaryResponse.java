@@ -6,6 +6,7 @@ import lombok.Getter;
 import met.ivan.devblog.entity.PostStatus;
 
 import java.time.Instant;
+import java.util.Set;
 
 @Getter
 @AllArgsConstructor
@@ -20,4 +21,6 @@ public class PostSummaryResponse {
     private final AuthorSummary author;
     private final Instant publishedAt;
     private final Instant createdAt;
+    private final Set<String> tags;
+    private final Long viewCount;
 }

@@ -9,6 +9,7 @@ import met.ivan.devblog.entity.User;
 
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 public class TestDataFactory {
@@ -81,6 +82,8 @@ public class TestDataFactory {
                 .status(PostStatus.DRAFT)
                 .author(author)
                 .category(category)
+                .tags(new LinkedHashSet<>())
+                .viewCount(0L)
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
                 .build();
@@ -96,6 +99,26 @@ public class TestDataFactory {
                 .status(PostStatus.PUBLISHED)
                 .author(author)
                 .category(category)
+                .tags(new LinkedHashSet<>())
+                .viewCount(0L)
+                .publishedAt(Instant.now())
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+    }
+
+    public static Post publishedPost(User author, Category category, Set<String> tags, long viewCount) {
+        return Post.builder()
+                .id(11L)
+                .title("Published Post")
+                .slug("published-post")
+                .contentMarkdown("# Published with tags")
+                .excerpt("A published post with tags")
+                .status(PostStatus.PUBLISHED)
+                .author(author)
+                .category(category)
+                .tags(new LinkedHashSet<>(tags))
+                .viewCount(viewCount)
                 .publishedAt(Instant.now())
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())

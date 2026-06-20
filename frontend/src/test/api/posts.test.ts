@@ -39,6 +39,8 @@ const mockPost = {
   createdAt: '2025-01-01T00:00:00Z',
   contentMarkdown: '# Hello',
   updatedAt: '2025-01-01T00:00:00Z',
+  tags: ['vue', 'frontend'],
+  viewCount: 42,
 }
 
 const mockPage = {
@@ -69,6 +71,48 @@ describe('postsApi', () => {
         params: { category: 'vue', page: 0, size: 12 },
       })
       expect(result).toEqual(mockPage)
+    })
+
+    it('forwards sort=popular to GET /posts', async () => {
+      const http = (await import('@/api/http')).default
+      ;(http.get as ReturnType<typeof vi.fn>).mockResolvedValue({ data: mockPage })
+
+      const { postsApi } = await import('@/api/posts')
+      await postsApi.listPublished({ sort: 'popular', page: 0, size: 12 })
+
+      expect(http.get).toHaveBeenCalledWith('/posts', {
+        params: { sort: 'popular', page: 0, size: 12 },
+      })
+    })
+
+    it('forwards sort=latest to GET /posts', async () => {
+      const http = (await import('@/api/http')).default
+      ;(http.get as ReturnType<typeof vi.fn>).mockResolvedValue({ data: mockPage })
+
+      const { postsApi } = await import('@/api/posts')
+      await postsApi.listPublished({ sort: 'latest', page: 0, size: 12 })
+
+      expect(http.get).toHaveBeenCalledWith('/posts', {
+        params: { sort: 'latest', page: 0, size: 12 },
+      })
+    })
+
+    it('forwards category and search together with sort', async () => {
+      const http = (await import('@/api/http')).default
+      ;(http.get as ReturnType<typeof vi.fn>).mockResolvedValue({ data: mockPage })
+
+      const { postsApi } = await import('@/api/posts')
+      await postsApi.listPublished({
+        category: 'spring',
+        search: 'jwt',
+        sort: 'popular',
+        page: 0,
+        size: 12,
+      })
+
+      expect(http.get).toHaveBeenCalledWith('/posts', {
+        params: { category: 'spring', search: 'jwt', sort: 'popular', page: 0, size: 12 },
+      })
     })
   })
 

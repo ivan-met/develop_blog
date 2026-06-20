@@ -35,6 +35,7 @@ const form = reactive({
   contentMarkdown: '',
   excerpt: '',
   categoryId: null as number | null,
+  tagsInput: '', // raw comma/enter-separated string; parsed to string[] on submit
 })
 
 const currentStatus = ref<PostStatus>('DRAFT')
@@ -56,6 +57,7 @@ onMounted(async () => {
     form.contentMarkdown = p.contentMarkdown
     form.excerpt = p.excerpt ?? ''
     form.categoryId = p.category?.id ?? null
+    form.tagsInput = (p.tags ?? []).join(', ')
     currentStatus.value = p.status
   } catch (err) {
     if (axios.isAxiosError(err)) {
@@ -68,6 +70,18 @@ onMounted(async () => {
     loadingPost.value = false
   }
 })
+
+/** Parse comma/space-separated tagsInput into a deduplicated lowercase string[] */
+function parseTags(): string[] {
+  return [
+    ...new Set(
+      form.tagsInput
+        .split(/[,\n]+/)
+        .map((t) => t.trim().toLowerCase())
+        .filter((t) => t.length > 0),
+    ),
+  ]
+}
 
 function validateForm(): boolean {
   clearErrors()
@@ -108,6 +122,7 @@ async function saveDraft() {
         contentMarkdown: form.contentMarkdown,
         excerpt: form.excerpt || undefined,
         categoryId: form.categoryId ?? undefined,
+        tags: parseTags(),
       })
       // If currently published and saving draft, switch to DRAFT
       if (currentStatus.value === 'PUBLISHED') {
@@ -120,6 +135,7 @@ async function saveDraft() {
         excerpt: form.excerpt || undefined,
         categoryId: form.categoryId ?? undefined,
         status: 'DRAFT',
+        tags: parseTags(),
       })
     }
 
@@ -165,6 +181,7 @@ async function publish() {
         contentMarkdown: form.contentMarkdown,
         excerpt: form.excerpt || undefined,
         categoryId: form.categoryId ?? undefined,
+        tags: parseTags(),
       })
       result = await postsApi.changeStatus(postId.value, { status: 'PUBLISHED' })
     } else {
@@ -174,6 +191,7 @@ async function publish() {
         excerpt: form.excerpt || undefined,
         categoryId: form.categoryId ?? undefined,
         status: 'PUBLISHED',
+        tags: parseTags(),
       })
     }
 
@@ -308,6 +326,22 @@ async function unpublish() {
                 />
               </FormField>
             </div>
+
+            <FormField
+              id="tagsInput"
+              label="Tags"
+              :error="errors.tagsInput"
+              hint="Optional — comma-separated (e.g. jwt, spring-security)"
+            >
+              <AppInput
+                id="tagsInput"
+                v-model="form.tagsInput"
+                type="text"
+                placeholder="jwt, rest-api, tutorial"
+                :has-error="!!errors.tagsInput"
+                :disabled="saving"
+              />
+            </FormField>
 
             <AlertMessage v-if="submitError" type="error" :message="submitError" />
           </div>

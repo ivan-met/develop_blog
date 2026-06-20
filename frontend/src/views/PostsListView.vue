@@ -14,6 +14,7 @@ const error = ref<string | null>(null)
 
 const searchQuery = ref('')
 const selectedCategory = ref<string>('')
+const sortMode = ref<'latest' | 'popular'>('latest')
 const currentPage = ref(0)
 const pageSize = 12
 
@@ -27,6 +28,7 @@ async function fetchPosts() {
     posts.value = await postsApi.listPublished({
       category: selectedCategory.value || undefined,
       search: searchQuery.value || undefined,
+      sort: sortMode.value,
       page: currentPage.value,
       size: pageSize,
     })
@@ -50,9 +52,21 @@ watch(selectedCategory, () => {
   fetchPosts()
 })
 
+function setSortMode(mode: 'latest' | 'popular') {
+  if (sortMode.value === mode) return
+  sortMode.value = mode
+  currentPage.value = 0
+  fetchPosts()
+}
+
 function goToPage(page: number) {
   currentPage.value = page
   fetchPosts()
+}
+
+function handleTagClick(tag: string) {
+  searchQuery.value = tag
+  // The watch on searchQuery will debounce and re-fetch
 }
 
 onMounted(async () => {
@@ -84,67 +98,119 @@ onMounted(async () => {
       </p>
     </div>
 
-    <!-- Search + filters -->
+    <!-- Search + sort + filters -->
     <div class="mb-6 flex flex-col gap-4">
-      <!-- Search bar -->
-      <div class="relative w-full sm:max-w-md">
-        <svg
-          class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
-          style="color: #8B949E;"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          aria-hidden="true"
+      <!-- Search bar + sort toggle row -->
+      <div class="flex flex-col sm:flex-row gap-3 sm:items-center">
+        <!-- Search bar -->
+        <div class="relative w-full sm:max-w-md">
+          <svg
+            class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
+            style="color: #8B949E;"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            v-model="searchQuery"
+            type="search"
+            placeholder="Search posts, tags…"
+            class="w-full pl-9 pr-3 py-2 rounded text-sm transition-all"
+            style="background-color: #161B22; color: #E6EDF3; border: 1px solid #30363D; outline: none; font-family: Inter, sans-serif;"
+            aria-label="Search posts"
+            @focus="($event.target as HTMLInputElement).style.borderColor = '#E6A817'"
+            @blur="($event.target as HTMLInputElement).style.borderColor = '#30363D'"
+          />
+        </div>
+
+        <!-- Sort toggle: segmented control -->
+        <div
+          role="group"
+          aria-label="Sort posts"
+          class="flex rounded overflow-hidden flex-shrink-0"
+          style="border: 1px solid #30363D;"
         >
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-        <input
-          v-model="searchQuery"
-          type="search"
-          placeholder="Search posts…"
-          class="w-full pl-9 pr-3 py-2 rounded text-sm transition-all"
-          style="background-color: #161B22; color: #E6EDF3; border: 1px solid #30363D; outline: none; font-family: Inter, sans-serif;"
-          aria-label="Search posts"
-          @focus="($event.target as HTMLInputElement).style.borderColor = '#E6A817'"
-          @blur="($event.target as HTMLInputElement).style.borderColor = '#30363D'"
-        />
+          <button
+            type="button"
+            class="px-3 py-1.5 text-xs font-mono transition-all cursor-pointer"
+            :style="{
+              fontFamily: '\'JetBrains Mono\', monospace',
+              backgroundColor: sortMode === 'latest' ? 'rgba(230, 168, 23, 0.1)' : 'transparent',
+              color: sortMode === 'latest' ? '#E6A817' : '#8B949E',
+              borderRight: '1px solid #30363D',
+              outline: 'none',
+            }"
+            :aria-pressed="sortMode === 'latest'"
+            @click="setSortMode('latest')"
+            @focus="($event.target as HTMLElement).style.outlineColor = 'rgba(230, 168, 23, 0.5)'; ($event.target as HTMLElement).style.outlineWidth = '2px'; ($event.target as HTMLElement).style.outlineStyle = 'solid'; ($event.target as HTMLElement).style.outlineOffset = '-2px'"
+            @blur="($event.target as HTMLElement).style.outline = 'none'"
+          >
+            Latest
+          </button>
+          <button
+            type="button"
+            class="px-3 py-1.5 text-xs font-mono transition-all cursor-pointer"
+            :style="{
+              fontFamily: '\'JetBrains Mono\', monospace',
+              backgroundColor: sortMode === 'popular' ? 'rgba(230, 168, 23, 0.1)' : 'transparent',
+              color: sortMode === 'popular' ? '#E6A817' : '#8B949E',
+              outline: 'none',
+            }"
+            :aria-pressed="sortMode === 'popular'"
+            @click="setSortMode('popular')"
+            @focus="($event.target as HTMLElement).style.outlineColor = 'rgba(230, 168, 23, 0.5)'; ($event.target as HTMLElement).style.outlineWidth = '2px'; ($event.target as HTMLElement).style.outlineStyle = 'solid'; ($event.target as HTMLElement).style.outlineOffset = '-2px'"
+            @blur="($event.target as HTMLElement).style.outline = 'none'"
+          >
+            Most Popular
+          </button>
+        </div>
       </div>
 
-      <!-- Category filter chips -->
-      <div
-        v-if="categories.length > 0"
-        class="flex flex-wrap gap-2"
-        role="group"
-        aria-label="Filter by category"
-      >
-        <button
-          type="button"
-          class="px-3 py-1 rounded text-xs font-mono transition-all cursor-pointer"
-          :style="{
-            fontFamily: '\'JetBrains Mono\', monospace',
-            backgroundColor: selectedCategory === '' ? 'rgba(230, 168, 23, 0.1)' : 'transparent',
-            color: selectedCategory === '' ? '#E6A817' : '#8B949E',
-            border: `1px solid ${selectedCategory === '' ? 'rgba(230, 168, 23, 0.4)' : '#30363D'}`,
-          }"
-          @click="selectedCategory = ''"
+      <!-- Technology filter chips -->
+      <div v-if="categories.length > 0">
+        <p
+          class="text-xs font-mono mb-2"
+          style="color: #8B949E; font-family: 'JetBrains Mono', monospace;"
         >
-          All
-        </button>
-        <button
-          v-for="cat in categories"
-          :key="cat.id"
-          type="button"
-          class="px-3 py-1 rounded text-xs font-mono transition-all cursor-pointer"
-          :style="{
-            fontFamily: '\'JetBrains Mono\', monospace',
-            backgroundColor: selectedCategory === cat.slug ? 'rgba(230, 168, 23, 0.1)' : 'transparent',
-            color: selectedCategory === cat.slug ? '#E6A817' : '#8B949E',
-            border: `1px solid ${selectedCategory === cat.slug ? 'rgba(230, 168, 23, 0.4)' : '#30363D'}`,
-          }"
-          @click="selectedCategory = cat.slug"
+          Technology
+        </p>
+        <div
+          class="flex flex-wrap gap-2"
+          role="group"
+          aria-label="Filter by technology"
         >
-          {{ cat.name }}
-        </button>
+          <button
+            type="button"
+            class="px-3 py-1 rounded text-xs font-mono transition-all cursor-pointer"
+            :style="{
+              fontFamily: '\'JetBrains Mono\', monospace',
+              backgroundColor: selectedCategory === '' ? 'rgba(230, 168, 23, 0.1)' : 'transparent',
+              color: selectedCategory === '' ? '#E6A817' : '#8B949E',
+              border: `1px solid ${selectedCategory === '' ? 'rgba(230, 168, 23, 0.4)' : '#30363D'}`,
+            }"
+            @click="selectedCategory = ''"
+          >
+            All
+          </button>
+          <button
+            v-for="cat in categories"
+            :key="cat.id"
+            type="button"
+            class="px-3 py-1 rounded text-xs font-mono transition-all cursor-pointer"
+            :style="{
+              fontFamily: '\'JetBrains Mono\', monospace',
+              backgroundColor: selectedCategory === cat.slug ? 'rgba(230, 168, 23, 0.1)' : 'transparent',
+              color: selectedCategory === cat.slug ? '#E6A817' : '#8B949E',
+              border: `1px solid ${selectedCategory === cat.slug ? 'rgba(230, 168, 23, 0.4)' : '#30363D'}`,
+            }"
+            @click="selectedCategory = cat.slug"
+          >
+            {{ cat.name }}
+          </button>
+        </div>
       </div>
     </div>
 
@@ -174,6 +240,7 @@ onMounted(async () => {
         v-for="post in posts.content"
         :key="post.id"
         :post="post"
+        @tag-click="handleTagClick"
       />
     </div>
 
