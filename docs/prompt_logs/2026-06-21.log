@@ -983,3 +983,136 @@ update @CLAUDE.md and @README.md
 [2026-06-21T06:53:00] (session e099b472)
 checkout new branch and commit push all files including prompt logs
 
+[2026-06-21T07:02:22] (session a51beb5e)
+can the project for errors
+
+[2026-06-21T07:02:30] (session a51beb5e)
+scan the project for errors
+
+[2026-06-21T07:09:47] (session 9e71f82e)
+analyze project. Project cant be started
+rg.springframework.orm.jpa.JpaSystemException: Could not prepare statement [[SQLITE_ERROR] SQL error or missing database (no such column: p1_0.view_count)] [select p1_0.id,p1_0.author_id,p1_0.category_id,p1_0.content_markdown,p1_0.created_at,p1_0.excerpt,p1_0.published_at,p1_0.slug,p1_0.status,p1_0.title,p1_0.updated_at,p1_0.version,p1_0.view_count from posts p1_0]
+    at org.springframework.orm.jpa.hibernate.HibernateExceptionTranslator.convertHibernateAccessException(HibernateExceptionTranslator.java:223) ~[spring-orm-7.0.8.jar:7.0.8]
+    at org.springframework.orm.jpa.hibernate.HibernateExceptionTranslator.convertHibernateAccessException(HibernateExceptionTranslator.java:131) ~[spring-orm-7.0.8.jar:7.0.8]
+    at org.springframework.orm.jpa.hibernate.HibernateExceptionTranslator.translateExceptionIfPossible(HibernateExceptionTranslator.java:105) ~[spring-orm-7.0.8.jar:7.0.8]
+    at org.springframework.orm.jpa.vendor.HibernateJpaDialect.translateExceptionIfPossible(HibernateJpaDialect.java:223) ~[spring-orm-7.0.8.jar:7.0.8]
+    at org.springframework.orm.jpa.AbstractEntityManagerFactoryBean.translateExceptionIfPossible(AbstractEntityManagerFactoryBean.java:577) ~[spring-orm-7.0.8.jar:7.0.8]
+    at org.springframework.dao.support.ChainedPersistenceExceptionTranslator.translateExceptionIfPossible(ChainedPersistenceExceptionTranslator.java:61) ~[spring-tx-7.0.8.jar:7.0.8]
+    at org.springframework.dao.support.DataAccessUtils.translateIfNecessary(DataAccessUtils.java:346) ~[spring-tx-7.0.8.jar:7.0.8]
+    at org.springframework.dao.support.PersistenceExceptionTranslationInterceptor.invoke(PersistenceExceptionTranslationInterceptor.java:157) ~[spring-tx-7.0.8.jar:7.0.8]
+    at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179) ~[spring-aop-7.0.8.jar:7.0.8]
+    at org.springframework.data.jpa.repository.support.CrudMethodMetadataPostProcessor$CrudMethodMetadataPopulatingMethodInterceptor.invoke(CrudMethodMetadataPostProcessor.java:166) ~[spring-data-jpa-4.1.0.jar:4.1.0]
+    at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179) ~[spring-aop-7.0.8.jar:7.0.8]
+    at org.springframework.aop.framework.JdkDynamicAopProxy.invoke(JdkDynamicAopProxy.java:222) ~[spring-aop-7.0.8.jar:7.0.8]
+    at jdk.proxy4/jdk.proxy4.$Proxy154.findAll(Unknown Source) ~[na:na]
+    at met.ivan.devblog.config.DataInitializer.seedEngagement(DataInitializer.java:580) ~[classes/:na]
+    at met.ivan.devblog.config.DataInitializer.run(DataInitializer.java:119) ~[classes/:na]
+    at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103) ~[na:na]
+    at java.base/java.lang.reflect.Method.invoke(Method.java:580) ~[na:na]
+    at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:359) ~[spring-aop-7.0.8.jar:7.0.8]
+    at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:190) ~[spring-aop-7.0.8.jar:7.0.8]
+    at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:158) ~[spring-aop-7.0.8.jar:7.0.8]
+    at org.springframework.transaction.interceptor.TransactionInterceptor$1.proceedWithInvocation(TransactionInterceptor.java:133) ~[spring-tx-7.0.8.jar:7.0.8]
+    at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:371) ~[spring-tx-7.0.8.jar:7.0.8]
+    at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:130) ~[spring-tx-7.0.8.jar:7.0.8]
+    at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179) ~[spring-aop-7.0.8.jar:7.0.8]
+    at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:719) ~[spring-aop-7.0.8.jar:7.0.8]
+    at met.ivan.devblog.config.DataInitializer$$SpringCGLIB$$0.run(<generated>) ~[classes/:na]
+    at org.springframework.boot.SpringApplication.lambda$callRunner$0(SpringApplication.java:788) ~[spring-boot-4.1.0.jar:4.1.0]
+    at org.springframework.util.function.ThrowingConsumer$1.acceptWithException(ThrowingConsumer.java:82) ~[spring-core-7.0.8.jar:7.0.8]
+    at org.springframework.util.function.ThrowingConsumer.accept(ThrowingConsumer.java:60) ~[spring-core-7.0.8.jar:7.0.8]
+    at org.springframework.util.function.ThrowingConsumer$1.accept(ThrowingConsumer.java:86) ~[spring-core-7.0.8.jar:7.0.8]
+    at org.springframework.boot.SpringApplication.callRunner(SpringApplication.java:800) ~[spring-boot-4.1.0.jar:4.1.0]
+    at org.springframework.boot.SpringApplication.callRunner(SpringApplication.java:788) ~[spring-boot-4.1.0.jar:4.1.0]
+    at org.springframework.boot.SpringApplication.lambda$callRunners$0(SpringApplication.java:776) ~[spring-boot-4.1.0.jar:4.1.0]
+    at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:184) ~[na:na]
+    at java.base/java.util.stream.SortedOps$SizedRefSortingSink.end(SortedOps.java:357) ~[na:na]
+    at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:510) ~[na:na]
+    at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499) ~[na:na]
+    at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:151) ~[na:na]
+    at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:174) ~[na:na]
+    at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234) ~[na:na]
+    at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596) ~[na:na]
+    at org.springframework.boot.SpringApplication.callRunners(SpringApplication.java:776) ~[spring-boot-4.1.0.jar:4.1.0]
+    at org.springframework.boot.SpringApplication.run(SpringApplication.java:328) ~[spring-boot-4.1.0.jar:4.1.0]
+    at org.springframework.boot.SpringApplication.run(SpringApplication.java:1365) ~[spring-boot-4.1.0.jar:4.1.0]
+    at org.springframework.boot.SpringApplication.run(SpringApplication.java:1354) ~[spring-boot-4.1.0.jar:4.1.0]
+    at met.ivan.devblog.DevblogApplication.main(DevblogApplication.java:12) ~[classes/:na]
+    at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103) ~[na:na]
+    at java.base/java.lang.reflect.Method.invoke(Method.java:580) ~[na:na]
+    at org.springframework.boot.devtools.restart.RestartLauncher.run(RestartLauncher.java:52) ~[spring-boot-devtools-4.1.0.jar:4.1.0]
+Caused by: org.hibernate.exception.GenericJDBCException: Could not prepare statement [[SQLITE_ERROR] SQL error or missing database (no such column: p1_0.view_count)] [select p1_0.id,p1_0.author_id,p1_0.category_id,p1_0.content_markdown,p1_0.created_at,p1_0.excerpt,p1_0.published_at,p1_0.slug,p1_0.status,p1_0.title,p1_0.updated_at,p1_0.version,p1_0.view_count from posts p1_0]
+    at org.hibernate.exception.internal.StandardSQLExceptionConverter.convert(StandardSQLExceptionConverter.java:39) ~[hibernate-core-7.4.1.Final.jar:7.4.1.Final]
+    at org.hibernate.engine.jdbc.spi.SqlExceptionHelper.convert(SqlExceptionHelper.java:115) ~[hibernate-core-7.4.1.Final.jar:7.4.1.Final]
+    at org.hibernate.engine.jdbc.internal.StatementPreparerImpl$StatementPreparationTemplate.prepareStatement(StatementPreparerImpl.java:194) ~[hibernate-core-7.4.1.Final.jar:7.4.1.Final]
+    at org.hibernate.engine.jdbc.internal.StatementPreparerImpl.prepareQueryStatement(StatementPreparerImpl.java:157) ~[hibernate-core-7.4.1.Final.jar:7.4.1.Final]
+    at org.hibernate.sql.exec.internal.StandardStatementCreator.createStatement(StandardStatementCreator.java:46) ~[hibernate-core-7.4.1.Final.jar:7.4.1.Final]
+    at org.hibernate.sql.results.jdbc.internal.DeferredResultSetAccess.executeQuery(DeferredResultSetAccess.java:255) ~[hibernate-core-7.4.1.Final.jar:7.4.1.Final]
+    at org.hibernate.sql.results.jdbc.internal.DeferredResultSetAccess.getResultSet(DeferredResultSetAccess.java:188) ~[hibernate-core-7.4.1.Final.jar:7.4.1.Final]
+    at org.hibernate.sql.results.jdbc.internal.JdbcValuesResultSetImpl.<init>(JdbcValuesResultSetImpl.java:71) ~[hibernate-core-7.4.1.Final.jar:7.4.1.Final]
+    at org.hibernate.sql.exec.internal.JdbcSelectExecutorStandardImpl.resolveJdbcValues(JdbcSelectExecutorStandardImpl.java:422) ~[hibernate-core-7.4.1.Final.jar:7.4.1.Final]
+    at org.hibernate.sql.exec.internal.JdbcSelectExecutorStandardImpl.resolveJdbcValuesSource(JdbcSelectExecutorStandardImpl.java:349) ~[hibernate-core-7.4.1.Final.jar:7.4.1.Final]
+    at org.hibernate.sql.exec.internal.JdbcSelectExecutorStandardImpl.doExecuteQuery(JdbcSelectExecutorStandardImpl.java:143) ~[hibernate-core-7.4.1.Final.jar:7.4.1.Final]
+    at org.hibernate.sql.exec.internal.JdbcSelectExecutorStandardImpl.executeQuery(JdbcSelectExecutorStandardImpl.java:100) ~[hibernate-core-7.4.1.Final.jar:7.4.1.Final]
+    at org.hibernate.sql.exec.spi.JdbcSelectExecutor.executeQuery(JdbcSelectExecutor.java:63) ~[hibernate-core-7.4.1.Final.jar:7.4.1.Final]
+    at org.hibernate.sql.exec.spi.JdbcSelectExecutor.list(JdbcSelectExecutor.java:137) ~[hibernate-core-7.4.1.Final.jar:7.4.1.Final]
+    at org.hibernate.query.sqm.internal.ConcreteSqmSelectQueryPlan.lambda$new$1(ConcreteSqmSelectQueryPlan.java:136) ~[hibernate-core-7.4.1.Final.jar:7.4.1.Final]
+    at org.hibernate.query.sqm.internal.ConcreteSqmSelectQueryPlan.withCacheableSqmInterpretation(ConcreteSqmSelectQueryPlan.java:484) ~[hibernate-core-7.4.1.Final.jar:7.4.1.Final]
+    at org.hibernate.query.sqm.internal.ConcreteSqmSelectQueryPlan.performList(ConcreteSqmSelectQueryPlan.java:411) ~[hibernate-core-7.4.1.Final.jar:7.4.1.Final]
+    at org.hibernate.query.sqm.internal.SqmQueryImpl.doList(SqmQueryImpl.java:379) ~[hibernate-core-7.4.1.Final.jar:7.4.1.Final]
+    at org.hibernate.query.spi.AbstractSelectionQuery.list(AbstractSelectionQuery.java:153) ~[hibernate-core-7.4.1.Final.jar:7.4.1.Final]
+    at org.hibernate.query.Query.getResultList(Query.java:121) ~[hibernate-core-7.4.1.Final.jar:7.4.1.Final]
+    at org.springframework.data.jpa.repository.support.SimpleJpaRepository.findAll(SimpleJpaRepository.java:412) ~[spring-data-jpa-4.1.0.jar:4.1.0]
+    at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103) ~[na:na]
+    at java.base/java.lang.reflect.Method.invoke(Method.java:580) ~[na:na]
+    at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:359) ~[spring-aop-7.0.8.jar:7.0.8]
+    at org.springframework.data.repository.core.support.RepositoryMethodInvoker$RepositoryFragmentMethodInvoker.lambda$new$0(RepositoryMethodInvoker.java:278) ~[spring-data-commons-4.1.0.jar:4.1.0]
+    at org.springframework.data.repository.core.support.RepositoryMethodInvoker.doInvoke(RepositoryMethodInvoker.java:169) ~[spring-data-commons-4.1.0.jar:4.1.0]
+    at org.springframework.data.repository.core.support.RepositoryMethodInvoker.invoke(RepositoryMethodInvoker.java:158) ~[spring-data-commons-4.1.0.jar:4.1.0]
+    at org.springframework.data.repository.core.support.RepositoryComposition$RepositoryFragments.invoke(RepositoryComposition.java:545) ~[spring-data-commons-4.1.0.jar:4.1.0]
+    at org.springframework.data.repository.core.support.RepositoryComposition.invoke(RepositoryComposition.java:290) ~[spring-data-commons-4.1.0.jar:4.1.0]
+    at org.springframework.data.repository.core.support.RepositoryFactorySupport$ImplementationMethodExecutionInterceptor.invoke(RepositoryFactorySupport.java:690) ~[spring-data-commons-4.1.0.jar:4.1.0]
+    at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179) ~[spring-aop-7.0.8.jar:7.0.8]
+    at org.springframework.data.repository.core.support.QueryExecutorMethodInterceptor.doInvoke(QueryExecutorMethodInterceptor.java:171) ~[spring-data-commons-4.1.0.jar:4.1.0]
+    at org.springframework.data.repository.core.support.QueryExecutorMethodInterceptor.invoke(QueryExecutorMethodInterceptor.java:146) ~[spring-data-commons-4.1.0.jar:4.1.0]
+    at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179) ~[spring-aop-7.0.8.jar:7.0.8]
+    at org.springframework.data.projection.DefaultMethodInvokingMethodInterceptor.invoke(DefaultMethodInvokingMethodInterceptor.java:69) ~[spring-data-commons-4.1.0.jar:4.1.0]
+    at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179) ~[spring-aop-7.0.8.jar:7.0.8]
+    at org.springframework.transaction.interceptor.TransactionInterceptor$1.proceedWithInvocation(TransactionInterceptor.java:133) ~[spring-tx-7.0.8.jar:7.0.8]
+    at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:371) ~[spring-tx-7.0.8.jar:7.0.8]
+    at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:130) ~[spring-tx-7.0.8.jar:7.0.8]
+    at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179) ~[spring-aop-7.0.8.jar:7.0.8]
+    at org.springframework.dao.support.PersistenceExceptionTranslationInterceptor.invoke(PersistenceExceptionTranslationInterceptor.java:135) ~[spring-tx-7.0.8.jar:7.0.8]
+    ... 41 common frames omitted
+Caused by: org.sqlite.SQLiteException: [SQLITE_ERROR] SQL error or missing database (no such column: p1_0.view_count)
+    at org.sqlite.core.DB.newSQLException(DB.java:1182) ~[sqlite-jdbc-3.53.2.0.jar:na]
+    at org.sqlite.core.DB.newSQLException(DB.java:1193) ~[sqlite-jdbc-3.53.2.0.jar:na]
+    at org.sqlite.core.DB.throwex(DB.java:1153) ~[sqlite-jdbc-3.53.2.0.jar:na]
+    at org.sqlite.core.NativeDB.prepare_utf8(Native Method) ~[sqlite-jdbc-3.53.2.0.jar:na]
+    at org.sqlite.core.NativeDB.prepare(NativeDB.java:135) ~[sqlite-jdbc-3.53.2.0.jar:na]
+    at org.sqlite.core.DB.prepare(DB.java:265) ~[sqlite-jdbc-3.53.2.0.jar:na]
+    at org.sqlite.core.CorePreparedStatement.<init>(CorePreparedStatement.java:46) ~[sqlite-jdbc-3.53.2.0.jar:na]
+    at org.sqlite.jdbc3.JDBC3PreparedStatement.<init>(JDBC3PreparedStatement.java:33) ~[sqlite-jdbc-3.53.2.0.jar:na]
+    at org.sqlite.jdbc4.JDBC4PreparedStatement.<init>(JDBC4PreparedStatement.java:28) ~[sqlite-jdbc-3.53.2.0.jar:na]
+    at org.sqlite.jdbc4.JDBC4Connection.prepareStatement(JDBC4Connection.java:34) ~[sqlite-jdbc-3.53.2.0.jar:na]
+    at org.sqlite.jdbc3.JDBC3Connection.prepareStatement(JDBC3Connection.java:225) ~[sqlite-jdbc-3.53.2.0.jar:na]
+    at com.zaxxer.hikari.pool.ProxyConnection.prepareStatement(ProxyConnection.java:342) ~[HikariCP-7.0.2.jar:na]
+    at com.zaxxer.hikari.pool.HikariProxyConnection.prepareStatement(HikariProxyConnection.java) ~[HikariCP-7.0.2.jar:na]
+    at org.hibernate.engine.jdbc.internal.StatementPreparerImpl$4.doPrepare(StatementPreparerImpl.java:155) ~[hibernate-core-7.4.1.Final.jar:7.4.1.Final]
+    at org.hibernate.engine.jdbc.internal.StatementPreparerImpl$StatementPreparationTemplate.prepareStatement(StatementPreparerImpl.java:183) ~[hibernate-core-7.4.1.Final.jar:7.4.1.Final]
+
+[2026-06-21T07:11:13] (session 9e71f82e)
+update CLAUDE.md to reflect the new backend path
+
+[2026-06-21T07:12:24] (session 9e71f82e)
+stage the move and commit it in new branch
+
+[2026-06-21T07:13:21] (session 9e71f82e)
+push it
+
+[2026-06-21T07:13:59] (session 9e71f82e)
+check if @README.md  needs to be updated
+
+[2026-06-21T07:15:54] (session 9e71f82e)
+commit and push logs too
+

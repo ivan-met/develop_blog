@@ -41,7 +41,7 @@ discovering technical content to foster knowledge sharing across technology comm
 
 ```
 develop_blog/
-├── backend/devblog/devblog/        # Spring Boot Maven project (package: met.ivan.devblog)
+├── backend/devblog/               # Spring Boot Maven project (package: met.ivan.devblog)
 │   ├── pom.xml
 │   ├── mvnw / mvnw.cmd              # Maven wrapper
 │   └── src/
@@ -72,12 +72,12 @@ develop_blog/
 └── docs/                           # Plans (docs/plans) + prompt logs (docs/prompt_logs)
 ```
 
-> Note: the Maven project currently lives at the nested path
-> `backend/devblog/devblog/`. Run backend commands from that directory.
+> Note: the Maven project lives at `backend/devblog/`. Run backend commands from
+> that directory.
 
 ## Build & Run
 
-### Backend (from `backend/devblog/devblog/`)
+### Backend (from `backend/devblog/`)
 - Run: `./mvnw spring-boot:run` (Windows: `mvnw.cmd spring-boot:run`) — serves on `:8080`
 - Test: `./mvnw test`
 - Package: `./mvnw clean package`
