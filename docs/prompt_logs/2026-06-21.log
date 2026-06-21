@@ -1,0 +1,985 @@
+[2026-06-21T06:12:05] (session 1223e77a)
+create plan for feature:
+Administration
+•    Manage categories
+•    Moderate comments
+•    Manage users and content
+•    View platform statistics
+
+Delegate frontend and backend tasks to frontend and backend agents. Keep in mind that tests are mandatory and ask as many questions as needed. When plan is ready save it in project docs/plans
+
+[2026-06-21T06:14:58] (session 1223e77a)
+<task-notification>
+<task-id>a1c877c352c187955</task-id>
+<tool-use-id>toolu_01LpxxE6RaZBZKDpEe8ErLaY</tool-use-id>
+<output-file>C:\Users\ivan_\AppData\Local\Temp\claude\C--projects-develop-blog\1223e77a-f709-4b79-8dd4-df9698730c4a\tasks\a1c877c352c187955.output</output-file>
+<status>completed</status>
+<summary>Agent "Explore frontend admin structure" came to rest</summary>
+<note>A task-notification fires each time this agent comes to rest with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Perfect! Now I have a comprehensive view of the current state. Let me create a detailed report.
+
+---
+
+## Comprehensive Frontend Exploration Report
+
+Based on my read-only exploration of your Vue 3 + TypeScript frontend at `C:\projects\develop_blog\frontend\src`, here's the current state relevant to your Administration feature:
+
+### 1. EXISTING ADMIN VIEWS
+
+Two admin pages already exist:
+
+**C:\projects\develop_blog\frontend\src\views\admin\UsersView.vue**
+- Fully functional user management table with search and pagination
+- Features:
+  - Paginated user list (page size: 20)
+  - Search/filter by username/email (debounced 350ms)
+  - Toggle ADMIN/USER roles per user (inline button toggles)
+  - Toggle user active/inactive status
+  - Per-row loading states during saves
+  - Error handling with Axios error unwrapping
+  - Responsive table with hover states
+  - Total user count display
+
+**C:\projects\develop_blog\frontend\src\views\admin\CategoriesView.vue**
+- Full CRUD for categories with split-panel UI
+- Features:
+  - Category list with name, slug, description columns
+  - Add/edit form in side panel (right side, sticky)
+  - Client-side form validation (name required, max 100 chars)
+  - Server error handling with field errors
+  - Delete with confirmation dialog
+  - Conflict detection (409 status when post references category)
+  - Success/error alert messages
+  - Empty states
+
+### 2. ROUTER SETUP &amp; AUTH GUARDS
+
+**File: C:\projects\develop_blog\frontend\src\router\index.ts**
+
+**Route Structure:**
+```
+/                          - Public home (posts list)
+/login, /register          - Public auth pages, redirect if authenticated
+/profile                   - Auth required
+/posts/new, /posts/:id/edit - Auth required
+/posts/:slug               - Public post detail
+/me/posts, /me/bookmarks   - Auth required
+/authors/:username         - Public author profile
+/admin/users               - requiresAuth + requiresAdmin
+/admin/categories          - requiresAuth + requiresAdmin
+```
+
+**Global Guard (lines 100-125):**
+- Redirects authenticated users away from `/login` and `/register`
+- Protects auth-required routes: redirects to `/login` with redirect query param
+- **Admin guard (lines 113-122):**
+  - Checks `to.meta.requiresAdmin`
+  - If authenticated but no currentUser loaded: calls `auth.loadMe()` first
+  - Uses `auth.isAdmin` computed (checks for ADMIN role)
+  - Redirects non-admins to home
+
+**Key Meta Properties Used:**
+- `public: true` - No auth check
+- `redirectIfAuth: true` - Redirect if already authenticated
+- `requiresAuth: true` - Check `isAuthenticated`
+- `requiresAdmin: true` - Check `isAdmin` and load user if needed
+
+### 3. PINIA AUTH STORE
+
+**File: C:\projects\develop_blog\frontend\src\stores\auth.ts**
+
+**State:**
+```typescript
+accessToken: string | null         // From localStorage
+refreshToken: string | null        // From localStorage
+currentUser: UserResponse | null    // Loaded from /users/me
+loading: boolean
+```
+
+**Key Getters:**
+```typescript
+isAuthenticated: boolean  // !!accessToken
+isAdmin: boolean         // currentUser?.roles.includes('ADMIN')
+isUser: boolean          // currentUser?.roles.includes('USER')
+```
+
+**Actions:**
+- `register(data)` - Sets tokens and currentUser
+- `login(data)` - Sets tokens and currentUser
+- `logout()` - Clears state, best-effort API call
+- `refresh()` - Token refresh via refresh token
+- `loadMe()` - Fetches current user profile from `/users/me`
+
+**Auto-Rehydration (lines 102-106):**
+- On store init: if accessToken exists but no currentUser, calls `loadMe()`
+- Ensures user data is loaded on page refresh
+
+### 4. API CLIENT LAYER
+
+**File: C:\projects\develop_blog\frontend\src\api/types.ts**
+
+Key types for admin features:
+
+```typescript
+UserResponse {
+  id: number
+  username: string
+  email: string
+  displayName: string | null
+  bio: string | null
+  avatarUrl: string | null
+  roles: string[]        // ['ADMIN'], ['USER'], or both
+  active: boolean
+  createdAt: string
+}
+
+Page&lt;T&gt; {
+  content: T[]
+  totalElements: number
+  totalPages: number
+  number: number         // Current page (0-indexed)
+  size: number
+  first: boolean
+  last: boolean
+}
+
+UpdateRolesRequest {
+  roles: string[]
+}
+
+UpdateStatusRequest {
+  active: boolean
+}
+```
+
+**HTTP Client: C:\projects\develop_blog\frontend\src\api\http.ts**
+
+- Uses Axios with base URL `/api`
+- **Request Interceptor:** Attaches Bearer token to all requests
+- **Response Interceptor (401 handling):**
+  - Detects 401 responses
+  - Queues concurrent requests while one refresh is in progress
+  - Calls `auth.refresh()` automatically
+  - Retries original request with new token
+  - Falls back to logout on refresh failure
+  - Prevents retry loops on auth endpoints
+
+**API Modules (established patterns):**
+
+**C:\projects\develop_blog\frontend\src\api\auth.ts**
+```typescript
+register(data)     // POST /auth/register
+login(data)        // POST /auth/login
+refresh(data)      // POST /auth/refresh
+logout(data)       // POST /auth/logout
+```
+
+**C:\projects\develop_blog\frontend\src\api\users.ts**
+```typescript
+getMe()                        // GET /users/me
+updateMe(data)                 // PUT /users/me
+changePassword(data)           // PUT /users/me/password
+listUsers(params)              // GET /admin/users (paginated, search)
+getUser(id)                    // GET /admin/users/:id
+updateRoles(id, data)          // PUT /admin/users/:id/roles
+updateStatus(id, data)         // PUT /admin/users/:id/status
+```
+
+**C:\projects\develop_blog\frontend\src\api\categories.ts**
+```typescript
+list()                         // GET /categories
+getBySlug(slug)                // GET /categories/:slug
+create(data)                   // POST /admin/categories
+update(id, data)               // PUT /admin/categories/:id
+remove(id)                     // DELETE /admin/categories/:id
+```
+
+**C:\projects\develop_blog\frontend\src\api\posts.ts**
+```typescript
+listPublished(params)          // GET /posts (public)
+getBySlug(slug)                // GET /posts/:slug (public)
+listMine(params)               // GET /posts/mine (auth required)
+getMine(id)                    // GET /posts/mine/:id (auth required)
+create(data)                   // POST /posts
+update(id, data)               // PUT /posts/:id
+changeStatus(id, data)         // PUT /posts/:id/status
+remove(id)                     // DELETE /posts/:id
+```
+
+**C:\projects\develop_blog\frontend\src\api\comments.ts**
+```typescript
+list(slug, params)             // GET /posts/:slug/comments (paginated)
+create(slug, data)             // POST /posts/:slug/comments
+remove(id)                     // DELETE /comments/:id
+```
+
+### 5. REUSABLE COMPONENTS
+
+**Base Components (src/components/):**
+
+**AppButton.vue**
+- Props: `type`, `variant`, `disabled`, `loading`, `fullWidth`
+- Variants: 'primary' (gold #E6A817), 'secondary' (ghost with border), 'danger' (red), 'ghost'
+- Shows spinner when `loading: true`
+- Used throughout admin views for CTA buttons
+
+**FormField.vue**
+- Props: `id`, `label`, `error`, `hint`
+- Label: uppercase, monospace, gray
+- Renders error or hint text below slot
+- Used for form layout in add/edit panels
+
+**AppInput.vue**
+- Props: `id`, `type`, `placeholder`, `modelValue`, `hasError`, `disabled`
+- Two-way binding with `v-model`
+- Shows red border on `hasError: true`
+- Gold border on focus
+- Used in forms
+
+**AlertMessage.vue**
+- Props: `type` ('error' | 'success' | 'info'), `message`
+- Color-coded backgrounds (red, green, gold)
+- role="alert", aria-live="polite"
+- Used for page-level feedback
+
+**StatusBadge.vue** (minimal component for post status)
+- Displays DRAFT/PUBLISHED status with colors
+
+**Data Components:**
+- **PostCard.vue** - Post summary card with category, tags, author, stats
+- **CommentList.vue** - Comment thread display with delete support
+- **CommentForm.vue** - Comment submission form
+- **LikeButton.vue** - Toggle like with count
+- **BookmarkButton.vue** - Toggle bookmark
+
+**Layout/UI Components:**
+- **NavBar.vue** - Header with admin link visibility based on role (see section 2)
+- **MarkdownEditor.vue** - Rich text editor for posts
+- **MarkdownPreview.vue** - Preview with syntax highlighting
+- **CategorySelect.vue** - Dropdown to select category
+- **AuthorByline.vue** - Author info display
+
+### 6. TESTING PATTERNS
+
+**Setup: C:\projects\develop_blog\frontend\src\test\setup.ts**
+- localStorage mock with vi.fn() for all methods
+- Clears before each test
+- Clears all mocks with `vi.clearAllMocks()`
+
+**Vite/Vitest Config: C:\projects\develop_blog\frontend\vite.config.ts**
+```typescript
+test: {
+  environment: 'jsdom',
+  globals: true,                    // describe, it, etc. available globally
+  setupFiles: ['./src/test/setup.ts']
+}
+```
+
+**Store Test Example: C:\projects\develop_blog\frontend\src\test\stores\auth.test.ts**
+- Mocks auth and users APIs before importing store
+- Creates fresh Pinia for each test: `setActivePinia(createPinia())`
+- Tests state, getters, and actions separately
+- Mocks API responses with `vi.fn().mockResolvedValue()`
+- Tests localStorage persistence
+- Tests error propagation
+
+**Router Guard Test: C:\projects\develop_blog\frontend\src\test\router\guards.test.ts**
+- Creates test router that mirrors production guards
+- Tests three user scenarios: unauthenticated, user, admin
+- Tests redirect query params and role-based access
+- Uses `navigateTo()` helper to push routes
+
+**Component Test Example: C:\projects\develop_blog\frontend\src\test\components\PostCard.test.ts**
+- Mocks child components (StatusBadge)
+- Mounts component with test router
+- Tests rendering, event emission (tagClick), and data display
+- Tests edge cases (0 views, 1k+ views, empty tags)
+
+**View Test Example: C:\projects\develop_blog\frontend\src\test\views\MyPostsView.test.ts**
+- Mocks API modules
+- Creates test router
+- Tests loading states, filtering (by DRAFT/PUBLISHED)
+- Tests user interactions (buttons, clicks)
+- Tests confirmation dialogs with `vi.spyOn(window, 'confirm')`
+- Tests navigation to new routes
+- Uses `flushPromises()` to wait for async renders
+
+**Test Pattern Conventions:**
+- Mock APIs at module level with `vi.mock('@/api/...')`
+- Create mock data objects (mockUser, mockPage, etc.)
+- Test helpers for mounting (createTestRouter, mountCard, etc.)
+- Use `beforeEach` to reset state and mocks
+
+### 7. STYLING CONVENTIONS &amp; TAILWIND
+
+**Design System Colors (GitHub Dark Theme):**
+- Background: `#0D1117` (main), `#161B22` (surface), `#1C2128` (hover)
+- Text: `#E6EDF3` (primary), `#8B949E` (secondary), `#30363D` (border)
+- Accent: `#E6A817` (gold)
+- Status: `#3FB950` (green/success), `#F85149` (red/error)
+- Monospace font: JetBrains Mono, fallback 'Courier New'
+- Sans-serif font: Inter
+
+**Layout Patterns:**
+- Max-width container: `max-w-7xl mx-auto px-4 sm:px-6`
+- Responsive tables: `overflow-x-auto` for small screens
+- Flex for nav: `hidden sm:flex` for desktop, separate mobile menu
+- Side panels: `w-full md:w-80 flex-shrink-0` for sticky sidebar
+
+**Common Tailwind Classes:**
+- `text-xs font-mono` for labels and metadata
+- `rounded text-sm` for inputs/buttons
+- `transition-all` for smooth interactions
+- `opacity-50 cursor-not-allowed` for disabled states
+- `line-clamp-1`, `line-clamp-2` for text truncation
+- Mobile-first: `sm:hidden`, `sm:flex` for breakpoints
+
+**Inline Styles vs Tailwind:**
+- Color values use inline `style` because of custom color palette
+- Layout uses Tailwind (`flex`, `gap`, `px`, `py`, `rounded`, etc.)
+- Hover effects use `@mouseover`/`@mouseleave` with inline style updates
+- Focus states use `@focus`/`@blur` for input borders
+
+**Admin View Patterns:**
+- Page header: monospace comment line ("// admin.users") + title + description
+- Table header row: `background-color: #161B22` with `border-bottom: 1px solid #30363D`
+- Table cells: `px-4 py-3` padding
+- Hover row: `@mouseover` sets `#1C2128`, `@mouseleave` resets
+- Pagination controls: Bottom bar with "Page X of Y" and Prev/Next buttons
+- Side panel (categories): `border: 1px solid #30363D`, with close button
+
+---
+
+## SUMMARY FOR YOUR ADMINISTRATION FEATURE
+
+**Current Coverage:**
+- ✓ Users management (search, roles, status) — COMPLETE
+- ✓ Categories management (CRUD) — COMPLETE
+- ✗ Comments moderation — NOT STARTED
+- ✗ Content management (post approve/reject/feature) — NOT STARTED
+- ✗ Platform statistics/dashboard — NOT STARTED
+
+**To Build:**
+1. **Comments moderation** → likely `admin/CommentsView.vue` + extend `commentsApi` with admin endpoints
+2. **Content management** → likely `admin/PostsView.vue` + extend `postsApi` with admin endpoints
+3. **Statistics dashboard** → new `admin/StatsView.vue` + new `statsApi.ts`
+4. **Route additions** → Add to `router/index.ts` with `requiresAdmin: true` meta
+5. **API extensions** → Add type definitions to `api/types.ts` for new responses
+6. **Store (optional)** → Could add an `admin.ts` Pinia store if shared admin state is needed
+
+**Key Reusable Patterns Already Established:**
+- Guard logic with `isAdmin` check
+- Paginated list views with search/filter
+- Side panel create/edit forms with validation
+- Per-row loading states
+- Error handling with Axios error unwrapping
+- AlertMessage for user feedback
+- Monospace headers with "// namespace.feature" style
+- All tests mock APIs and use Pinia/Vue Router test utilities
+
+All paths are absolute from the project root.</result>
+<usage><subagent_tokens>54389</subagent_tokens><tool_uses>37</tool_uses><duration_ms>155804</duration_ms></usage>
+</task-notification>
+
+[2026-06-21T06:15:40] (session 1223e77a)
+<task-notification>
+<task-id>a77498d6530f5750e</task-id>
+<tool-use-id>toolu_01Po67KKkWw1yHPgovbpDWKM</tool-use-id>
+<output-file>C:\Users\ivan_\AppData\Local\Temp\claude\C--projects-develop-blog\1223e77a-f709-4b79-8dd4-df9698730c4a\tasks\a77498d6530f5750e.output</output-file>
+<status>completed</status>
+<summary>Agent "Explore backend admin &amp; domain structure" came to rest</summary>
+<note>A task-notification fires each time this agent comes to rest with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Perfect! Now let me create a comprehensive report. Based on my thorough exploration of the codebase, here's the current state of your Spring Boot backend relevant to the Administration feature:
+
+## Spring Boot Backend - Current State for Administration Feature
+
+### 1. EXISTING ENTITIES (in `/entity` package)
+
+**User.java** (C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\entity\User.java)
+- Key fields: `id`, `username` (unique, indexed), `email` (unique, indexed), `passwordHash`, `displayName`, `bio`, `avatarUrl`
+- Status field: `active` (boolean, default=true) — used to disable/enable users
+- Relationships: ManyToMany with Role (join table `user_roles`)
+- Timestamps: `createdAt` (immutable), `updatedAt`, `version` (optimistic locking)
+
+**Role.java** (C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\entity\Role.java)
+- Fields: `id`, `name` (enum: ADMIN, USER, stored as string, unique, indexed)
+
+**RoleName.java** (C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\entity\RoleName.java)
+- Enum with two values: ADMIN, USER
+
+**Post.java** (C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\entity\Post.java)
+- Key fields: `id`, `title`, `slug` (unique, indexed), `contentMarkdown`, `excerpt`, `viewCount` (default=0)
+- Status field: `status` enum (DRAFT, PUBLISHED, indexed) — default DRAFT
+- Relationships: ManyToOne with User (author), ManyToOne with Category, ElementCollection for tags
+- Timestamps: `createdAt`, `updatedAt`, `publishedAt` (nullable), `version`
+
+**PostStatus.java** (C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\entity\PostStatus.java)
+- Enum: DRAFT, PUBLISHED
+
+**Category.java** (C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\entity\Category.java)
+- Key fields: `id`, `name` (unique), `slug` (unique, indexed), `description`
+- Timestamps: `createdAt`, `updatedAt`
+
+**Comment.java** (C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\entity\Comment.java)
+- Key fields: `id`, `content` (TEXT)
+- Relationships: ManyToOne with Post (indexed), ManyToOne with User/author (indexed)
+- Timestamps: `createdAt` (immutable, no updatedAt)
+- **NOTE: No deletion flag — comments are hard-deleted, no moderation status**
+
+**PostLike.java** (C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\entity\PostLike.java)
+- Fields: `id`, unique constraint on (user_id, post_id)
+- Relationships: ManyToOne with User (indexed), ManyToOne with Post (indexed)
+- Timestamps: `createdAt`
+
+**PostBookmark.java** (C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\entity\PostBookmark.java)
+- Fields: `id`, unique constraint on (user_id, post_id)
+- Relationships: ManyToOne with User (indexed), ManyToOne with Post (indexed)
+- Timestamps: `createdAt`
+
+**RefreshToken.java** (C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\entity\RefreshToken.java)
+- Fields: `id`, `token` (unique, length 512), `expiresAt`, `revoked` (boolean, default=false)
+- Relationships: ManyToOne with User (indexed)
+
+---
+
+### 2. EXISTING CONTROLLERS &amp; ENDPOINTS
+
+**AdminCategoryController.java** (C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\controller\AdminCategoryController.java)
+- Class-level: `@PreAuthorize("hasRole('ADMIN')")`
+- Endpoints:
+  - `POST /api/admin/categories` → `create(CreateCategoryRequest)` → 201 CREATED
+  - `PUT /api/admin/categories/{id}` → `update(Long, UpdateCategoryRequest)` → 200 OK
+  - `DELETE /api/admin/categories/{id}` → `delete(Long)` → 204 NO_CONTENT
+
+**AdminUserController.java** (C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\controller\AdminUserController.java)
+- Class-level: `@PreAuthorize("hasRole('ADMIN')")`
+- Endpoints:
+  - `GET /api/admin/users` → `listUsers(String search, Pageable)` → Page&lt;UserResponse&gt; (search by username/email/displayName)
+  - `GET /api/admin/users/{id}` → `getUser(Long)` → UserResponse
+  - `PUT /api/admin/users/{id}/roles` → `updateRoles(Long, UpdateRolesRequest)` → UserResponse
+  - `PUT /api/admin/users/{id}/status` → `updateStatus(Long, UpdateStatusRequest)` → UserResponse
+
+**CommentController.java** (C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\controller\CommentController.java)
+- `GET /api/posts/{slug}/comments` → `listComments(String, Pageable, UserDetails)` → Page&lt;CommentResponse&gt; (public, newest-first)
+- `POST /api/posts/{slug}/comments` → `createComment(String, CreateCommentRequest, UserDetails)` → 201 CREATED (authenticated)
+- `DELETE /api/comments/{id}` → `deleteComment(Long, UserDetails)` → 204 NO_CONTENT (comment author, post author, or admin)
+
+**PostController.java** (C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\controller\PostController.java)
+- `GET /api/posts` → `listPublished(...)` → Page&lt;PostSummaryResponse&gt; (public, filterable by category/search/sort)
+- `GET /api/posts/{slug}` → `getBySlug(String, UserDetails)` → PostResponse (public)
+- `GET /api/posts/mine` → `listMine(PostStatus, Pageable, UserDetails)` → authenticated only
+- `GET /api/posts/mine/{id}` → `getOwn(Long, UserDetails)` → authenticated only
+- `POST /api/posts` → `create(CreatePostRequest, UserDetails)` → 201 CREATED (authenticated)
+- `PUT /api/posts/{id}` → `update(Long, UpdatePostRequest, UserDetails)` → 200 OK (authenticated, owner only)
+- `PUT /api/posts/{id}/status` → `changeStatus(Long, UpdatePostStatusRequest, UserDetails)` → 200 OK (owner or admin)
+- `DELETE /api/posts/{id}` → `delete(Long, UserDetails)` → 204 NO_CONTENT (owner or admin)
+
+**CategoryController.java** (C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\controller\CategoryController.java)
+- `GET /api/categories` → `list()` → List&lt;CategoryResponse&gt; (public)
+- `GET /api/categories/{slug}` → `getBySlug(String)` → CategoryResponse (public)
+
+**AuthorController.java** (C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\controller\AuthorController.java)
+- `GET /api/authors/{username}` → `getProfile(String)` → AuthorProfileResponse (public, omits email/roles/id/active status)
+- `GET /api/authors/{username}/posts` → `getAuthorPosts(String, Pageable)` → Page&lt;PostSummaryResponse&gt; (public, published only)
+
+**UserController.java** (C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\controller\UserController.java)
+- `GET /api/users/me` → `getProfile(UserDetails)` → UserResponse (authenticated)
+- `PUT /api/users/me` → `updateProfile(UserDetails, UpdateProfileRequest)` → UserResponse (authenticated)
+- `PUT /api/users/me/password` → `changePassword(UserDetails, ChangePasswordRequest)` → 204 NO_CONTENT (authenticated)
+
+**EngagementController.java** (mentioned in file listing)
+- Handles likes and bookmarks (file not yet examined but referenced in services)
+
+---
+
+### 3. SECURITY SETUP (SecurityConfig.java)
+
+C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\config\SecurityConfig.java
+
+- **Authentication**: JWT-based, stateless (SessionCreationPolicy.STATELESS)
+- **Password encoding**: BCrypt with configurable strength (default 12)
+- **JWT Filter**: JwtAuthenticationFilter added before UsernamePasswordAuthenticationFilter
+- **Method-level security**: @EnableMethodSecurity enabled
+- **Role-based access rules** (in authorizeHttpRequests):
+  - `/api/auth/**` → permitAll
+  - `/api/admin/**` → hasRole("ADMIN")
+  - `/api/users/**` → authenticated
+  - `/api/posts/mine`, `/api/posts/mine/**` → authenticated
+  - `POST /api/posts` → authenticated
+  - `PUT /api/posts/**` → authenticated
+  - `DELETE /api/posts/**` → authenticated
+  - `GET /api/authors/**`, `GET /api/posts/**`, `GET /api/categories/**` → permitAll
+  - Catch-all: authenticated
+
+- **Method-level @PreAuthorize**:
+  - `@PreAuthorize("hasRole('ADMIN')")` on AdminCategoryController class
+  - `@PreAuthorize("hasRole('ADMIN')")` on AdminUserController class
+  - Comments/posts use custom logic in service methods (calling `principal.getAuthorities()`)
+
+- **Role naming**: Stored as "ROLE_" + enum name in security context (e.g., "ROLE_ADMIN", "ROLE_USER")
+- **Admin distinction**: Check for RoleName.ADMIN in roles or via authority string "ROLE_ADMIN"
+- **Exception handling**: Custom entry points for 401 (Unauthorized) and 403 (Forbidden) returning JSON errors
+
+---
+
+### 4. EXISTING SERVICES &amp; REPOSITORIES
+
+**Services** (in `/service` and `/service/impl`):
+
+**AdminUserService.java** (interface)
+- `Page&lt;UserResponse&gt; listUsers(String search, Pageable)` — searches username/email/displayName
+- `UserResponse getUser(Long)` — fetch user with roles
+- `UserResponse updateRoles(Long, UpdateRolesRequest)` — assign ADMIN/USER roles
+- `UserResponse updateStatus(Long, UpdateStatusRequest)` — set active boolean
+
+**AdminUserServiceImpl.java**
+- Uses JpaSpecificationExecutor for dynamic search queries
+- Calls UserRepository.findByIdWithRoles() to fetch user with roles eagerly
+- Calls RoleRepository.findByName(RoleName) to resolve role enums
+- Handles role assignment as a Set&lt;Role&gt; replacement
+
+**CategoryService.java** (interface)
+- `List&lt;CategoryResponse&gt; list()` — all categories
+- `CategoryResponse getBySlug(String)` — by slug
+- `CategoryResponse create(CreateCategoryRequest)` — with slug generation
+- `CategoryResponse update(Long, UpdateCategoryRequest)` — with slug regeneration
+- `void delete(Long)` — throws ConflictException if posts reference it
+
+**CategoryServiceImpl.java**
+- Uses Slugs.uniqueSlug() utility to generate and ensure uniqueness
+- CategoryRepository.existsByNameAndIdNot() for duplicate checking
+- PostRepository.existsByCategory() to prevent deletion of referenced categories
+
+**CommentService.java** (interface)
+- `Page&lt;CommentResponse&gt; list(String slug, UserDetails, Pageable)` — newest-first
+- `CommentResponse create(String slug, String username, CreateCommentRequest)`
+- `void delete(Long, UserDetails)` — checks canDelete permissions
+
+**CommentServiceImpl.java**
+- Permission check: admin, comment author, or post author can delete
+- Loads published post by slug before allowing comment creation
+- Uses batch fetches to avoid N+1 (JOIN FETCH c.author, c.post, p.author)
+
+**PostService.java** (interface)
+- `PostResponse create(String username, CreatePostRequest)` — published status requires category
+- `PostResponse update(Long, UserDetails, UpdatePostRequest)` — owner only
+- `PostResponse changeStatus(Long, UserDetails, UpdatePostStatusRequest)` — owner or admin
+- `void delete(Long, UserDetails)` — owner only
+- `PostResponse getPublishedBySlug(String, UserDetails)` — enriches with engagement data
+- `Page&lt;PostSummaryResponse&gt; listPublished(String categorySlug, String search, String sort, Pageable, UserDetails)`
+- `PostResponse getOwn(Long, UserDetails)` — owner only
+- `Page&lt;PostSummaryResponse&gt; listOwn(UserDetails, PostStatus, Pageable)` — owner's drafts &amp; published
+
+**PostServiceImpl.java**
+- Admins are forbidden from authoring posts
+- Uses PostMapper to enrich responses with like counts and user's liked/bookmarked flags
+- Supports filtering by category, full-text search, custom sorting
+- Increments viewCount on read
+- Batch-fetches engagement data to avoid N+1
+
+**Repositories** (extend JpaRepository + JpaSpecificationExecutor where needed):
+
+**UserRepository.java**
+- Query methods: findByUsernameWithRoles, findByEmailWithRoles, findByUsernameOrEmailWithRoles (JPQL fetch joins)
+- Simple methods: findByUsername, findByEmail, existsByUsername, existsByEmail, existsByEmailAndIdNot
+- findByIdWithRoles(Long) — LEFT JOIN FETCH u.roles
+
+**CommentRepository.java**
+- Custom @Query: findByPostIdWithAuthor(Long, Pageable) — fetches with comment author, post, post author (avoids N+1)
+
+**CategoryRepository.java**
+- Methods: findBySlug, existsByName, existsByNameAndIdNot, existsBySlug, existsBySlugAndIdNot
+
+**PostRepository.java**
+- Query methods: findBySlug, findBySlugAndStatus, findByIdWithAuthorAndCategory (JPQL fetch joins)
+- Methods: existsBySlug, existsByCategory, countByAuthorUsername
+- Modifying query: incrementViewCount (atomic)
+
+**RoleRepository.java** (not shown but used) — findByName(RoleName)
+
+---
+
+### 5. EXISTING DTOs &amp; MAPPERS
+
+**DTOs** (in `/dto`):
+
+**UserResponse.java**
+- Fields: id, username, email, displayName, bio, avatarUrl, roles (List&lt;String&gt;), active, createdAt
+- Maps to users in admin panel
+
+**UpdateStatusRequest.java**
+- Field: active (Boolean, @NotNull)
+
+**UpdateRolesRequest.java**
+- Field: roles (List&lt;String&gt;, @NotNull)
+
+**CategoryResponse.java**
+- Fields: id, name, slug, description
+
+**CreateCategoryRequest.java** &amp; **UpdateCategoryRequest.java**
+- Both have: name, description
+
+**CommentResponse.java**
+- Fields: id, content, author (AuthorSummary), createdAt, canDelete (boolean)
+
+**CreateCommentRequest.java**
+- Field: content
+
+**PostResponse.java**
+- Fields: id, slug, title, excerpt, status (PostStatus enum), category (CategoryResponse), author (AuthorSummary), publishedAt, createdAt, contentMarkdown, updatedAt, tags (Set&lt;String&gt;), viewCount, likeCount, liked (Boolean), bookmarked (Boolean)
+- Uses @JsonInclude(NON_NULL)
+
+**PostSummaryResponse.java**
+- Fields: id, slug, title, excerpt, status, category, author, publishedAt, createdAt, tags, viewCount, likeCount
+
+**AuthorProfileResponse.java**
+- Fields: username, displayName, bio, avatarUrl, createdAt, postCount
+- Deliberately omits email, roles, id, active status (for public profile)
+
+**Mappers** (in `/mapper`):
+
+**UserMapper.java**
+- `toResponse(User)` → UserResponse (includes roles, active status)
+- `toAuthorProfile(User, postCount)` → AuthorProfileResponse (public, omits sensitive data)
+
+**CategoryMapper.java**
+- `toResponse(Category)` → CategoryResponse (simple direct mapping)
+
+**CommentMapper.java**
+- `toResponse(Comment, canDelete)` → CommentResponse
+
+**PostMapper.java** (not shown in detail but used in PostServiceImpl)
+- Maps Post to PostResponse with engagement data
+
+---
+
+### 6. DATA INITIALIZATION (DataInitializer.java)
+
+C:\projects\develop_blog\backend\devblog\devblog\src\main\java\met\ivan\devblog\config\DataInitializer.java
+
+Runs at application startup (ApplicationRunner):
+
+**Roles**: Creates ADMIN and USER roles (idempotent via roleRepository.findByName)
+
+**Seeded users** (from AppProperties.seed):
+- **Admin user**: username/email/password from config, assigned both ADMIN and USER roles, active=true
+- **Default user**: username/email/password from config, assigned USER role only, active=true
+
+**Seeded categories** (only if categoryRepository.count() == 0):
+- Java, Spring, Vue, DevOps (with descriptions)
+
+**Seeded posts** (only if postRepository.count() == 0):
+- 12 published posts with various categories, tags, viewCounts, and timestamps (spanning 30 days)
+- All authored by the default user (admin cannot author posts)
+
+**Seeded engagement** (only if commentRepository.count() == 0):
+- Comments and likes on first 3 posts by default user and admin
+
+**Logging**: Info level for critical operations, debug for individual records
+
+**AppProperties.java** configuration:
+- `app.seed.admin.username/email/password`
+- `app.seed.user.username/email/password`
+- `app.security.bcryptStrength` (default 12)
+
+---
+
+### 7. TESTING PATTERNS
+
+**Test structure**: tests in `src/test/java/met/ivan/devblog` with parallel package structure
+
+**TestDataFactory.java**
+- Static factory methods for common test entities
+- Methods: userRole(), adminRole(), userWithRole(Role), adminUser(Role, Role), category(), category(id, name, slug), draftPost(User, Category), publishedPost(User, Category), publishedPost(User, Category, tags, viewCount)
+- Uses builder patterns with default values (e.g., Instant.now())
+
+**WebMvcTest (Slice tests)** — Example: AdminCategoryControllerTest.java
+
+```java
+@WebMvcTest(controllers = {AdminCategoryController.class, GlobalExceptionHandler.class})
+@Import({SecurityConfig.class, JwtAuthenticationFilter.class, AppProperties.class})
+@ActiveProfiles("test")
+@DisplayName("AdminCategoryController")
+```
+
+- Beans: MockMvc (autowired), ObjectMapper (autowired)
+- Mocked: CategoryService (@MockitoBean), JwtService, CustomUserDetailsService
+- Auth simulation: `@WithMockUser(roles = "ADMIN")`, `@WithMockUser(roles = "USER")`
+- Anonymous testing: perform(post(...)) without auth headers → expects 401
+- Assertions: status().isXxx(), jsonPath(), content()
+- Mockito: when(...).thenReturn(...), verify(...), doThrow(...)
+- Test organization: authorization matrix tests, validation tests, success/failure cases
+
+**Integration tests** — Example: UserManagementIntegrationTest.java
+
+```java
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@ActiveProfiles("test")
+@DisplayName("User Management Integration Tests")
+```
+
+- Full application context loaded (@LocalServerPort for random port)
+- TestRestTemplate (not autowired, created manually)
+- Database state assertions (e.g., userRepository.findByUsernameWithRoles("admin")).isPresent())
+- Full auth flows: register → login → access protected endpoints → refresh token → logout
+- RBAC tests: verify USER cannot access /api/admin/users (403) but ADMIN can (200)
+- Error response assertions: HttpStatus, ErrorResponse.status, ErrorResponse.message
+
+**Service unit tests** — Example: AdminUserServiceImplTest.java
+
+```java
+@ExtendWith(MockitoExtension.class)
+@DisplayName("AdminUserServiceImpl")
+```
+
+- Mocks: UserRepository, RoleRepository, UserMapper
+- Injection: @InjectMocks on service under test
+- BeforeEach: setUp() creates TestDataFactory objects
+- Assertions: assertThat(...).isEqualTo(...), assertThatThrownBy(...).isInstanceOf(...)
+- Verification: verify(repo).method(...)
+- Pageable: PageRequest.of(0, 10), PageImpl for page responses
+
+**Repository tests** — Named CategoryRepositoryTest.java, CommentRepositoryTest.java, etc. (not examined)
+
+**Test profiles**: @ActiveProfiles("test") for test-specific configuration
+
+---
+
+### 8. KEY FINDINGS FOR ADMINISTRATION FEATURE
+
+**Already exists and ready**:
+- Admin role distinction (ADMIN role)
+- User enable/disable (active boolean on User)
+- Role management endpoint (PUT /api/admin/users/{id}/roles)
+- User status endpoint (PUT /api/admin/users/{id}/status)
+- Category CRUD admin endpoints (POST, PUT, DELETE /api/admin/categories)
+- User listing with search (GET /api/admin/users?search=...)
+- Comprehensive role-based access control via SecurityConfig and @PreAuthorize
+
+**Missing for full Administration feature**:
+- **No comment moderation**: Comments lack status/approved flags; hard-deleted only. Admin cannot soft-delete or flag.
+- **No content moderation**: Posts have status (DRAFT/PUBLISHED) but no "FLAGGED" or "UNDER_REVIEW" state.
+- **No platform statistics endpoint**: No aggregate endpoint for total posts/users/comments/engagement metrics.
+- **No user activity audit**: No audit log of admin actions (who disabled whom, when).
+- **No user suspension/ban**: active flag is binary; no temporary suspension or duration tracking.
+- **No comment author block**: Users cannot block others; admins can only hard-delete.
+- **No post visibility control beyond status**: Published posts are public; no "unlisted" state.
+
+**Recommendation for implementation**:
+1. Extend Comment entity with `status` (APPROVED, FLAGGED, DELETED) and `moderation_flag_reason`
+2. Extend Post entity with `moderation_status` (optional)
+3. Create CommentModerationController with admin endpoints (GET flagged comments, PATCH to approve/reject)
+4. Create PlatformStatisticsController with admin endpoints for dashboards
+5. Create AuditLog entity and service for admin action tracking
+6. Consider optio for user suspension (end_suspension_at Instant field)
+
+All this has existing infrastructure (SecurityConfig roles, repository patterns, DTO mappings, test patterns) to build upon.</result>
+<usage><subagent_tokens>62961</subagent_tokens><tool_uses>54</tool_uses><duration_ms>203309</duration_ms></usage>
+</task-notification>
+
+[2026-06-21T06:23:24] (session 48611452)
+checkout new branch and commit the new plan @docs/plans/administration.md
+
+[2026-06-21T06:24:00] (session 48611452)
+just push it
+
+[2026-06-21T06:30:02] (session 2edfe9d2)
+execute plan @docs/plans/administration.md
+
+[2026-06-21T06:40:02] (session 2edfe9d2)
+<task-notification>
+<task-id>a52ac1a19049d228f</task-id>
+<tool-use-id>toolu_01Nd7vrGKerJRTvJHatjYo7x</tool-use-id>
+<output-file>C:\Users\ivan_\AppData\Local\Temp\claude\C--projects-develop-blog\2edfe9d2-5607-4a44-b650-963497bd99f9\tasks\a52ac1a19049d228f.output</output-file>
+<status>completed</status>
+<summary>Agent "Implement frontend admin features" came to rest</summary>
+<note>A task-notification fires each time this agent comes to rest with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Both are green. Here is a complete summary of everything added and changed.
+
+---
+
+## Files added / changed
+
+### B1 — API layer &amp; types
+
+**`/frontend/src/api/types.ts`** — added:
+- `AdminCommentResponse` (id, content, author, postSlug, postTitle, createdAt)
+- `StatsTotals`, `TopPostResponse`, `RecentUserResponse`, `PlatformStatsResponse`
+
+**`/frontend/src/api/comments.ts`** — added `listAll({ search?, page?, size? })` → `GET /admin/comments`
+
+**`/frontend/src/api/posts.ts`** — added `listAdmin({ status?, search?, categorySlug?, page?, size? })` → `GET /admin/posts`
+
+**`/frontend/src/api/stats.ts`** (new) — `statsApi.getStats()` → `GET /admin/stats`
+
+### B2 — Views
+
+**`/frontend/src/views/admin/DashboardView.vue`** (new) — fetches `/admin/stats`; renders 8 stat cards in a 4-column grid (users/active, posts/published/draft, comments, categories, likes, bookmarks), three ranked lists (top by views, top by likes, recent signups), and 4 `&gt;_ label` navigation cards to the admin areas. The signature design element is a CSS `cursor-blink` animation on the stat value numbers — a `_` character that blinks at 1.2 s, giving the control-room terminal read.
+
+**`/frontend/src/views/admin/CommentsView.vue`** (new) — paginated table of all platform comments (author avatar+username, content excerpt, post title as link, date, Delete button). Debounced search (350 ms). Per-row `deleting` state; `window.confirm` guard on delete; optimistic list removal after deletion. Modelled exactly on `UsersView.vue` conventions.
+
+**`/frontend/src/views/admin/ContentView.vue`** (new) — paginated table of all posts across authors. Three filters: debounced search, status dropdown (All / Published / Draft), category dropdown (populated from `categoriesApi.list()`). Columns: title+tags, author, category, `StatusBadge`, views, likes, created. Actions: Publish/Unpublish via `postsApi.changeStatus`, Delete via `postsApi.remove` with confirm. Per-row `acting` state.
+
+### B3 — Routing &amp; nav
+
+**`/frontend/src/router/index.ts`** — added five admin routes with `requiresAuth + requiresAdmin` meta:
+- `/admin` → `DashboardView`
+- `/admin/comments` → `CommentsView`
+- `/admin/posts` → `ContentView`
+(existing `/admin/users` and `/admin/categories` unchanged)
+
+**`/frontend/src/components/NavBar.vue`** — replaced the two flat admin links ("Categories", "User Admin") with five links (Dashboard, Users, Categories, Comments, Content) in both the desktop nav and mobile menu, all gated under `v-if="auth.isAdmin"` and pointing to the new routes.
+
+### B4 — Tests
+
+**`/frontend/src/test/api/stats.test.ts`** (new) — 5 tests covering `getStats` request shape and response fields
+
+**`/frontend/src/test/api/comments.test.ts`** — 2 new tests for `listAll` (with and without params)
+
+**`/frontend/src/test/api/posts.test.ts`** — 3 new tests for `listAdmin` (all filters, no optional params, PUBLISHED filter)
+
+**`/frontend/src/test/views/DashboardView.test.ts`** (new) — 13 tests: heading, eyebrow label, totals display, top-posts lists, recent signups, nav cards, loading state, error state, empty list states
+
+**`/frontend/src/test/views/CommentsView.test.ts`** (new) — 12 tests: heading, listing, empty state, loading, error, debounced search, delete confirm/cancel, list refresh after delete, post-title link
+
+**`/frontend/src/test/views/ContentView.test.ts`** (new) — 14 tests: heading, listing (both statuses), empty state, loading, error, debounced search, status filter dropdown, unpublish/publish toggle, delete confirm/cancel, StatusBadge rendering, author display
+
+**`/frontend/src/test/router/guards.test.ts`** — extended: added `/admin`, `/admin/comments`, `/admin/posts` to the test router; 9 new tests covering admin access to all three new routes, non-admin redirect from each, and unauthenticated redirect from each
+
+### Lint &amp; test result
+- `npm run lint` (vue-tsc --noEmit): **clean, no output**
+- `npm test`: **281/281 tests pass, 26 test files, 0 failures**</result>
+<usage><subagent_tokens>97695</subagent_tokens><tool_uses>47</tool_uses><duration_ms>557241</duration_ms></usage>
+</task-notification>
+
+[2026-06-21T06:41:20] (session 2edfe9d2)
+<task-notification>
+<task-id>a693297df464f0367</task-id>
+<tool-use-id>toolu_01WH9psePH24gBkFNYGffyBK</tool-use-id>
+<output-file>C:\Users\ivan_\AppData\Local\Temp\claude\C--projects-develop-blog\2edfe9d2-5607-4a44-b650-963497bd99f9\tasks\a693297df464f0367.output</output-file>
+<status>completed</status>
+<summary>Agent "Implement backend admin features" came to rest</summary>
+<note>A task-notification fires each time this agent comes to rest with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>The no-match test (empty page) doesn't mock `countsByPostIds` — that's fine because `batchLikeCounts` checks for empty list and returns early without calling the repo.
+
+One final thing to check — the `AdminPostServiceImpl` uses `any(PageRequest.class)` for `postRepository.findAll(spec, pageable)`. But actually `pageable` here is a `Pageable` not necessarily a `PageRequest`. The `findAll` of JPA Specification Executor takes `Pageable`. In the mock I'm matching `any(PageRequest.class)` — this is fine since `pageable` in the test IS a `PageRequest`, which IS a `Pageable`.
+
+Everything looks structurally sound. Let me provide the summary of what was built and await test results.
+
+---
+
+Here is the complete summary of what was implemented:
+
+## What Was Built
+
+### Files Added (production code)
+
+**DTOs** (`src/main/java/met/ivan/devblog/dto/`):
+- `AdminCommentResponse.java` — `id`, `content`, `author` (AuthorSummary), `postSlug`, `postTitle`, `createdAt`
+- `TopPostResponse.java` — record with `slug`, `title`, `author` (AuthorSummary), `likeCount`
+- `RecentUserResponse.java` — record with `username`, `displayName`, `createdAt`
+- `PlatformStatsResponse.java` — record with `totals` (nested `StatsTotals` record), `topPostsByViews`, `topPostsByLikes`, `recentUsers`
+
+**Controllers** (`src/main/java/met/ivan/devblog/controller/`):
+- `AdminCommentController.java` — `GET /api/admin/comments` with optional `search`, `@PageableDefault(size=20, sort=createdAt DESC)`, `@PreAuthorize("hasRole('ADMIN')")`
+- `AdminPostController.java` — `GET /api/admin/posts` with optional `status`, `search`, `categorySlug`, same security
+- `AdminStatsController.java` — `GET /api/admin/stats`, same security
+
+**Services** (`src/main/java/met/ivan/devblog/service/` + `service/impl/`):
+- `AdminCommentService` + `AdminCommentServiceImpl` — delegates to the new repository query, normalizes blank search to null
+- `AdminPostService` + `AdminPostServiceImpl` — builds `Specification&lt;Post&gt;` for status/category/search filters, batches like counts via existing `countsByPostIds`
+- `AdminStatsService` + `AdminStatsServiceImpl` — aggregates from all repositories
+
+**Repository additions** (modified existing repositories):
+- `CommentRepository` — added `findAllWithAuthorAndPost(search, pageable)` with JPQL JOIN FETCH + explicit countQuery + case-insensitive search
+- `PostRepository` — added `countByStatus(PostStatus)` and `findTopByStatusOrderByViewCountDesc(status, pageable)` (FETCH joined)
+- `UserRepository` — added `countByActiveTrue()` and `findTop5ByOrderByCreatedAtDesc(pageable)`
+- `PostLikeRepository` — added `findTopPostsByLikeCount(pageable)` (GROUP BY post, ordered by count)
+
+### Files Added (test code)
+
+**Service unit tests** (`src/test/java/met/ivan/devblog/service/`):
+- `AdminCommentServiceImplTest.java` — 5 tests: null search, blank→null normalization, trimmed search passthrough, empty page, field mapping
+- `AdminPostServiceImplTest.java` — 4 tests: no filters, status filter, no matches, like count batching
+- `AdminStatsServiceImplTest.java` — 5 tests: totals aggregation, top-by-views, top-by-likes mapping, recent users mapping, empty platform
+
+**Controller slice tests** (`src/test/java/met/ivan/devblog/controller/`):
+- `AdminCommentControllerTest.java` — 6 tests: 401/403/200 auth matrix, search param, pagination defaults, JSON shape
+- `AdminPostControllerTest.java` — 7 tests: 401/403/200 auth matrix, status filter, search param, categorySlug param, JSON shape
+- `AdminStatsControllerTest.java` — 6 tests: 401/403/200 auth matrix, totals JSON, topByLikes shape, recentUsers shape, full top-level shape
+
+**Repository tests** (`src/test/java/met/ivan/devblog/repository/`):
+- `AdminCommentRepositoryTest.java` — 7 tests: all-null search, content match (CI), author match (CI), post title match (CI), no match, author loaded, post+author loaded, pagination
+- `AdminStatsRepositoryTest.java` — 8 tests: countByActiveTrue, findTop5ByCreatedAt newest-first, countByStatus (published + draft), findTopByStatusOrderByViewCount (top 3 in order, excludes drafts, respects limit), findTopPostsByLikeCount (most-liked-first, author accessible, limit, empty case)
+
+**Integration test** (`src/test/java/met/ivan/devblog/integration/`):
+- `AdminModerationIntegrationTest.java` — 12 tests: admin list/search comments (200), user→403, anon→401 for comments; admin list posts / filter by status (200), user→403, anon→401 for posts; admin fetch stats with non-zero totals (200) + consistency assertion (published+draft=total), user→403, anon→401 for stats
+
+### REST API Response Shapes
+
+**`GET /api/admin/comments`** → `Page&lt;AdminCommentResponse&gt;`:
+```json
+{
+  "content": [{
+    "id": 10,
+    "content": "string",
+    "author": { "id": 1, "username": "string", "displayName": "string" },
+    "postSlug": "string",
+    "postTitle": "string",
+    "createdAt": "2024-01-01T00:00:00Z"
+  }],
+  "totalElements": 1, "totalPages": 1, "size": 20, "number": 0
+}
+```
+
+**`GET /api/admin/posts`** → `Page&lt;PostSummaryResponse&gt;` (existing DTO, reused):
+```json
+{
+  "content": [{
+    "id": 10, "slug": "string", "title": "string", "excerpt": "string",
+    "status": "DRAFT|PUBLISHED",
+    "category": { "id": 1, "name": "Java", "slug": "java" },
+    "author": { "id": 1, "username": "string", "displayName": "string" },
+    "publishedAt": null, "createdAt": "...",
+    "tags": ["java"], "viewCount": 42, "likeCount": 5
+  }],
+  "totalElements": 1, "totalPages": 1, "size": 20, "number": 0
+}
+```
+
+**`GET /api/admin/stats`** → `PlatformStatsResponse`:
+```json
+{
+  "totals": {
+    "users": 10, "activeUsers": 8,
+    "posts": 20, "publishedPosts": 15, "draftPosts": 5,
+    "comments": 50, "categories": 4, "likes": 100, "bookmarks": 30
+  },
+  "topPostsByViews": [ /* PostSummaryResponse, top 5 */ ],
+  "topPostsByLikes": [{
+    "slug": "string", "title": "string",
+    "author": { "id": 1, "username": "string", "displayName": "string" },
+    "likeCount": 42
+  }],
+  "recentUsers": [{
+    "username": "string", "displayName": "string", "createdAt": "..."
+  }]
+}
+```
+
+**Note:** I cannot confirm the test suite is green — Bash access was denied in this session, preventing me from running `mvnw.cmd test`. Please run the Maven test suite with `JAVA_HOME` pointing to Corretto 21 and report any failures. The code is complete and structurally correct based on my review, but compilation and runtime validation requires the build to run.</result>
+<usage><subagent_tokens>114107</subagent_tokens><tool_uses>83</tool_uses><duration_ms>648172</duration_ms></usage>
+</task-notification>
+
+[2026-06-21T06:46:14] (session 2edfe9d2)
+commit this
+
+[2026-06-21T06:47:28] (session 2edfe9d2)
+commit and push
+
+[2026-06-21T06:50:19] (session e099b472)
+update @CLAUDE.md and @README.md
+
+[2026-06-21T06:53:00] (session e099b472)
+checkout new branch and commit push all files including prompt logs
+

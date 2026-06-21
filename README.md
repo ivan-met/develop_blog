@@ -52,8 +52,10 @@ communities.
   author, the post author, or an admin.
 - **Author profiles** — public pages at `/authors/:username` showing an author's display
   name, bio, avatar, join date, and their published posts (never exposing email/roles).
-- **Role-based administration** — admins manage users (roles, active status) and
-  categories.
+- **Role-based administration** — a unified `/admin` dashboard (platform statistics +
+  navigation hub) from which admins manage users (roles, active status), categories,
+  moderate comments across the platform, and manage all posts (across authors and
+  statuses).
 - **Secure by default** — stateless JWT auth, BCrypt password hashing, method-level
   authorization, and CORS configured for the SPA origin.
 - **Markdown rendering** — the frontend renders Markdown with syntax highlighting and
@@ -121,7 +123,7 @@ develop_blog/
 │       │   ├── config/             # Security, app properties, data seeding
 │       │   ├── controller/         # REST controllers + global exception handler
 │       │   ├── dto/                # Request/response DTOs (API boundary)
-│       │   ├── entity/             # JPA entities (User, Role, Post, Category, RefreshToken)
+│       │   ├── entity/             # JPA entities (User, Role, Post, Category, RefreshToken, Comment, PostLike, PostBookmark)
 │       │   ├── exception/          # Domain exceptions
 │       │   ├── mapper/             # Entity ⇄ DTO mappers
 │       │   ├── repository/         # Spring Data JPA repositories
