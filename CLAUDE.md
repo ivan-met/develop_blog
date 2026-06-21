@@ -103,11 +103,20 @@ Both halves are implemented and functional:
   and private bookmarks (`/api/posts/{slug}/like|bookmark`,
   `/api/users/me/bookmarks`), and public author profiles (`/api/authors/{username}` and
   `/{username}/posts`). Post payloads are enriched with `likeCount` (and `liked`/
-  `bookmarked` for the authenticated caller). On startup `DataInitializer` seeds roles, a
+  `bookmarked` for the authenticated caller). An Administration area (role `ADMIN`, all
+  under `/api/admin/**`) adds comment moderation (global comment list
+  `GET /api/admin/comments` + hard-delete via the existing comment endpoint), content
+  management (`GET /api/admin/posts` across all authors/statuses, reusing status-change/
+  delete), platform statistics (`GET /api/admin/stats`: headline totals + top posts by
+  views/likes + recent users), alongside the existing category and user management
+  endpoints. On startup `DataInitializer` seeds roles, a
   default admin/user, starter categories, starter posts (authored by the default user),
   and starter comments/likes for content discovery.
 - **Frontend** — Vue 3 + TypeScript SPA (Pinia, Vue Router with auth guards, typed Axios
-  client) covering auth, profile, post authoring, public browsing, and admin views.
+  client) covering auth, profile, post authoring, public browsing, and admin views. The
+  admin area is unified under an `/admin` dashboard hub (platform stats + nav) with comment
+  moderation (`/admin/comments`), content management (`/admin/posts`), plus the existing
+  user (`/admin/users`) and category (`/admin/categories`) management views.
 - **Config/secrets** — `application.yaml` exposes env-overridable settings (`JWT_SECRET`,
   token expirations, `CORS_ALLOWED_ORIGINS`, `SEED_*` credentials).
 - Tests exist on both sides (backend unit/slice/integration; frontend Vitest).

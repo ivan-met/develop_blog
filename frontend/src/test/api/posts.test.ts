@@ -232,4 +232,49 @@ describe('postsApi', () => {
       expect(result).toBeUndefined()
     })
   })
+
+  describe('listAdmin', () => {
+    it('calls GET /admin/posts with all filter params', async () => {
+      const http = (await import('@/api/http')).default
+      ;(http.get as ReturnType<typeof vi.fn>).mockResolvedValue({ data: mockPage })
+
+      const { postsApi } = await import('@/api/posts')
+      const result = await postsApi.listAdmin({
+        status: 'DRAFT',
+        search: 'vue',
+        categorySlug: 'frontend',
+        page: 0,
+        size: 20,
+      })
+
+      expect(http.get).toHaveBeenCalledWith('/admin/posts', {
+        params: { status: 'DRAFT', search: 'vue', categorySlug: 'frontend', page: 0, size: 20 },
+      })
+      expect(result).toEqual(mockPage)
+    })
+
+    it('calls GET /admin/posts without optional params when omitted', async () => {
+      const http = (await import('@/api/http')).default
+      ;(http.get as ReturnType<typeof vi.fn>).mockResolvedValue({ data: mockPage })
+
+      const { postsApi } = await import('@/api/posts')
+      await postsApi.listAdmin({ page: 0 })
+
+      expect(http.get).toHaveBeenCalledWith('/admin/posts', {
+        params: { page: 0 },
+      })
+    })
+
+    it('calls GET /admin/posts with PUBLISHED status filter', async () => {
+      const http = (await import('@/api/http')).default
+      ;(http.get as ReturnType<typeof vi.fn>).mockResolvedValue({ data: mockPage })
+
+      const { postsApi } = await import('@/api/posts')
+      await postsApi.listAdmin({ status: 'PUBLISHED', page: 0, size: 20 })
+
+      expect(http.get).toHaveBeenCalledWith('/admin/posts', {
+        params: { status: 'PUBLISHED', page: 0, size: 20 },
+      })
+    })
+  })
 })

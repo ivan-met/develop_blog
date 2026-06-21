@@ -64,4 +64,18 @@ export const postsApi = {
   remove(id: number): Promise<void> {
     return http.delete(`/posts/${id}`).then(() => undefined)
   },
+
+  // ─── Admin ────────────────────────────────────────────────────────────────
+
+  listAdmin(params: {
+    status?: 'DRAFT' | 'PUBLISHED'
+    search?: string
+    categorySlug?: string
+    page?: number
+    size?: number
+  }): Promise<Page<PostSummaryResponse>> {
+    return http
+      .get<Page<PostSummaryResponse>>('/admin/posts', { params })
+      .then((r) => r.data)
+  },
 }

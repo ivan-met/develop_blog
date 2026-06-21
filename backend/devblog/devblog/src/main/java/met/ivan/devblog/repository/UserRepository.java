@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -36,4 +37,13 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     @Query("SELECT u FROM User u LEFT JOIN FETCH u.roles WHERE u.id = :id")
     Optional<User> findByIdWithRoles(@Param("id") Long id);
+
+    /** Count active users — used for admin stats totals. */
+    long countByActiveTrue();
+
+    /**
+     * Latest 5 registered users ordered by createdAt descending — used for admin stats.
+     */
+    @Query("SELECT u FROM User u ORDER BY u.createdAt DESC")
+    List<User> findTop5ByOrderByCreatedAtDesc(Pageable pageable);
 }

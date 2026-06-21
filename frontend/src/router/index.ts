@@ -76,6 +76,12 @@ const router = createRouter({
 
     // ─── Admin ─────────────────────────────────────────────────────────────
     {
+      path: '/admin',
+      name: 'admin-dashboard',
+      component: () => import('@/views/admin/DashboardView.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
+    {
       path: '/admin/users',
       name: 'admin-users',
       component: () => import('@/views/admin/UsersView.vue'),
@@ -85,6 +91,18 @@ const router = createRouter({
       path: '/admin/categories',
       name: 'admin-categories',
       component: () => import('@/views/admin/CategoriesView.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
+    {
+      path: '/admin/comments',
+      name: 'admin-comments',
+      component: () => import('@/views/admin/CommentsView.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
+    {
+      path: '/admin/posts',
+      name: 'admin-content',
+      component: () => import('@/views/admin/ContentView.vue'),
       meta: { requiresAuth: true, requiresAdmin: true },
     },
 

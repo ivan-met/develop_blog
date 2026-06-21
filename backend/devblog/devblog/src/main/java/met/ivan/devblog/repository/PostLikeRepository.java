@@ -1,6 +1,8 @@
 package met.ivan.devblog.repository;
 
+import met.ivan.devblog.entity.Post;
 import met.ivan.devblog.entity.PostLike;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -30,4 +32,19 @@ public interface PostLikeRepository extends JpaRepository<PostLike, Long> {
      */
     @Query("SELECT pl.post.id FROM PostLike pl WHERE pl.user.id = :userId AND pl.post.id IN :postIds")
     List<Long> findLikedPostIds(@Param("userId") Long userId, @Param("postIds") Collection<Long> postIds);
+
+    /**
+     * Top N posts by like count. Returns pairs [Post, likeCount].
+     * Post associations (author, category) must be accessed within a transaction so that
+     * Hibernate can load them lazily, or the caller re-fetches the posts with JOIN FETCH.
+     * Pageable limits to top N (e.g. 5).
+     * Note: FETCH joins are not compatible with aggregate GROUP BY in JPQL; the post entity
+     * is returned by reference and its lazy associations will be loaded within the same
+     * transaction by the service layer.
+     */
+    @Query("SELECT pl.post, COUNT(pl) AS likeCount " +
+           "FROM PostLike pl " +
+           "GROUP BY pl.post " +
+           "ORDER BY likeCount DESC")
+    List<Object[]> findTopPostsByLikeCount(Pageable pageable);
 }

@@ -1,5 +1,5 @@
 import http from './http'
-import type { CommentResponse, Page } from './types'
+import type { AdminCommentResponse, CommentResponse, Page } from './types'
 
 export const commentsApi = {
   list(
@@ -19,5 +19,17 @@ export const commentsApi = {
 
   remove(id: number): Promise<void> {
     return http.delete(`/comments/${id}`).then(() => undefined)
+  },
+
+  // ─── Admin ────────────────────────────────────────────────────────────────
+
+  listAll(params: {
+    search?: string
+    page?: number
+    size?: number
+  }): Promise<Page<AdminCommentResponse>> {
+    return http
+      .get<Page<AdminCommentResponse>>('/admin/comments', { params })
+      .then((r) => r.data)
   },
 }
