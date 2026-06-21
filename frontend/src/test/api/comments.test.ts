@@ -101,4 +101,29 @@ describe('commentsApi', () => {
       expect(result).toBeUndefined()
     })
   })
+
+  describe('listAll (admin)', () => {
+    it('calls GET /admin/comments with search and pagination params', async () => {
+      const http = (await import('@/api/http')).default
+      ;(http.get as ReturnType<typeof vi.fn>).mockResolvedValue({ data: mockPage })
+
+      const { commentsApi } = await import('@/api/comments')
+      const result = await commentsApi.listAll({ search: 'hello', page: 0, size: 20 })
+
+      expect(http.get).toHaveBeenCalledWith('/admin/comments', {
+        params: { search: 'hello', page: 0, size: 20 },
+      })
+      expect(result).toEqual(mockPage)
+    })
+
+    it('calls GET /admin/comments without optional params when omitted', async () => {
+      const http = (await import('@/api/http')).default
+      ;(http.get as ReturnType<typeof vi.fn>).mockResolvedValue({ data: mockPage })
+
+      const { commentsApi } = await import('@/api/comments')
+      await commentsApi.listAll({})
+
+      expect(http.get).toHaveBeenCalledWith('/admin/comments', { params: {} })
+    })
+  })
 })

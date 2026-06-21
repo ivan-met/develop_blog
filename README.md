@@ -338,6 +338,24 @@ computed per requesting principal).
 | `PUT` | `/{id}` | Update a category. |
 | `DELETE` | `/{id}` | Delete a category. `204 No Content`. |
 
+### Admin — Comments — `/api/admin/comments` (role `ADMIN`)
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/` | Global comment moderation list (paginated `AdminCommentResponse`: `id`, `content`, `author`, `postSlug`, `postTitle`, `createdAt`). Query: `search` (matches content / author username / post title), pagination (default `size=20`, `createdAt DESC`). Delete a comment via `DELETE /api/comments/{id}`. |
+
+### Admin — Content — `/api/admin/posts` (role `ADMIN`)
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/` | List **all** posts across authors and statuses (paginated `PostSummaryResponse`). Query: `status` (`DRAFT`/`PUBLISHED`), `search` (title/tags), `categorySlug`, pagination (default `size=20`, `createdAt DESC`). Change status via `PUT /api/posts/{id}/status`; delete via `DELETE /api/posts/{id}`. |
+
+### Admin — Statistics — `/api/admin/stats` (role `ADMIN`)
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/` | Platform statistics (`PlatformStatsResponse`): `totals` (`users`, `activeUsers`, `posts`, `publishedPosts`, `draftPosts`, `comments`, `categories`, `likes`, `bookmarks`), `topPostsByViews` (top 5 `PostSummaryResponse`), `topPostsByLikes` (top 5 `TopPostResponse`: `slug`, `title`, `author`, `likeCount`), `recentUsers` (latest 5 `RecentUserResponse`: `username`, `displayName`, `createdAt`). |
+
 Errors are returned in a consistent JSON shape (`ErrorResponse`) via a global exception
 handler, with appropriate HTTP status codes (`400`, `401`, `403`, `404`, `409`, …).
 

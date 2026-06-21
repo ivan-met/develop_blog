@@ -166,6 +166,49 @@ export interface UpdateStatusRequest {
   active: boolean
 }
 
+// ─── Admin domain ────────────────────────────────────────────────────────────
+
+export interface AdminCommentResponse {
+  id: number
+  content: string
+  author: AuthorSummary
+  postSlug: string
+  postTitle: string
+  createdAt: string
+}
+
+export interface StatsTotals {
+  users: number
+  activeUsers: number
+  posts: number
+  publishedPosts: number
+  draftPosts: number
+  comments: number
+  categories: number
+  likes: number
+  bookmarks: number
+}
+
+export interface TopPostResponse {
+  slug: string
+  title: string
+  author: AuthorSummary
+  likeCount: number
+}
+
+export interface RecentUserResponse {
+  username: string
+  displayName: string | null
+  createdAt: string
+}
+
+export interface PlatformStatsResponse {
+  totals: StatsTotals
+  topPostsByViews: PostSummaryResponse[]
+  topPostsByLikes: TopPostResponse[]
+  recentUsers: RecentUserResponse[]
+}
+
 // ─── Pagination ──────────────────────────────────────────────────────────────
 
 export interface Page<T> {

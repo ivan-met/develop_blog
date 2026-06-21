@@ -61,6 +61,22 @@ function closeMobileMenu() {
             <!-- Admin-only links -->
             <template v-if="auth.isAdmin">
               <RouterLink
+                to="/admin"
+                class="nav-link px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
+                style="color: #8B949E;"
+                active-class="nav-link-active"
+              >
+                Dashboard
+              </RouterLink>
+              <RouterLink
+                to="/admin/users"
+                class="nav-link px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
+                style="color: #8B949E;"
+                active-class="nav-link-active"
+              >
+                Users
+              </RouterLink>
+              <RouterLink
                 to="/admin/categories"
                 class="nav-link px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
                 style="color: #8B949E;"
@@ -69,12 +85,20 @@ function closeMobileMenu() {
                 Categories
               </RouterLink>
               <RouterLink
-                to="/admin/users"
+                to="/admin/comments"
                 class="nav-link px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
                 style="color: #8B949E;"
                 active-class="nav-link-active"
               >
-                User Admin
+                Comments
+              </RouterLink>
+              <RouterLink
+                to="/admin/posts"
+                class="nav-link px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
+                style="color: #8B949E;"
+                active-class="nav-link-active"
+              >
+                Content
               </RouterLink>
             </template>
 
@@ -189,6 +213,24 @@ function closeMobileMenu() {
           <!-- Admin-only links -->
           <template v-if="auth.isAdmin">
             <RouterLink
+              to="/admin"
+              class="block px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
+              style="color: #8B949E;"
+              active-class="nav-link-active"
+              @click="closeMobileMenu"
+            >
+              Dashboard
+            </RouterLink>
+            <RouterLink
+              to="/admin/users"
+              class="block px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
+              style="color: #8B949E;"
+              active-class="nav-link-active"
+              @click="closeMobileMenu"
+            >
+              Users
+            </RouterLink>
+            <RouterLink
               to="/admin/categories"
               class="block px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
               style="color: #8B949E;"
@@ -198,13 +240,22 @@ function closeMobileMenu() {
               Categories
             </RouterLink>
             <RouterLink
-              to="/admin/users"
+              to="/admin/comments"
               class="block px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
               style="color: #8B949E;"
               active-class="nav-link-active"
               @click="closeMobileMenu"
             >
-              User Admin
+              Comments
+            </RouterLink>
+            <RouterLink
+              to="/admin/posts"
+              class="block px-3 py-2 rounded text-sm font-medium transition-colors no-underline"
+              style="color: #8B949E;"
+              active-class="nav-link-active"
+              @click="closeMobileMenu"
+            >
+              Content
             </RouterLink>
           </template>
 

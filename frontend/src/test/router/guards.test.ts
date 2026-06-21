@@ -46,8 +46,23 @@ function createTestRouter() {
         meta: { requiresAuth: true },
       },
       {
+        path: '/admin',
+        component: { template: '<div>Admin Dashboard</div>' },
+        meta: { requiresAuth: true, requiresAdmin: true },
+      },
+      {
         path: '/admin/users',
-        component: { template: '<div>Admin</div>' },
+        component: { template: '<div>Admin Users</div>' },
+        meta: { requiresAuth: true, requiresAdmin: true },
+      },
+      {
+        path: '/admin/comments',
+        component: { template: '<div>Admin Comments</div>' },
+        meta: { requiresAuth: true, requiresAdmin: true },
+      },
+      {
+        path: '/admin/posts',
+        component: { template: '<div>Admin Content</div>' },
         meta: { requiresAuth: true, requiresAdmin: true },
       },
     ],
@@ -182,11 +197,84 @@ describe('route guards', () => {
       expect(route.path).toBe('/admin/users')
     })
 
+    it('can access /admin (dashboard)', async () => {
+      await loginAsAdmin()
+      const router = createTestRouter()
+      const route = await navigateTo(router, '/admin')
+      expect(route.path).toBe('/admin')
+    })
+
+    it('can access /admin/comments', async () => {
+      await loginAsAdmin()
+      const router = createTestRouter()
+      const route = await navigateTo(router, '/admin/comments')
+      expect(route.path).toBe('/admin/comments')
+    })
+
+    it('can access /admin/posts', async () => {
+      await loginAsAdmin()
+      const router = createTestRouter()
+      const route = await navigateTo(router, '/admin/posts')
+      expect(route.path).toBe('/admin/posts')
+    })
+
     it('can access /profile', async () => {
       await loginAsAdmin()
       const router = createTestRouter()
       const route = await navigateTo(router, '/profile')
       expect(route.path).toBe('/profile')
+    })
+  })
+
+  describe('new admin routes — non-admin access', () => {
+    async function loginAsUser() {
+      const { authApi } = await import('@/api/auth')
+      ;(authApi.login as ReturnType<typeof vi.fn>).mockResolvedValue({
+        accessToken: 'token',
+        refreshToken: 'refresh',
+        user: { id: 1, username: 'user', email: 'user@test.com', displayName: null, bio: null, avatarUrl: null, roles: ['USER'], active: true, createdAt: '2024-01-01' },
+      })
+      const store = useAuthStore()
+      await store.login({ usernameOrEmail: 'user', password: 'pass' })
+    }
+
+    it('non-admin is redirected from /admin to /profile', async () => {
+      await loginAsUser()
+      const router = createTestRouter()
+      const route = await navigateTo(router, '/admin')
+      expect(route.path).toBe('/profile')
+    })
+
+    it('non-admin is redirected from /admin/comments to /profile', async () => {
+      await loginAsUser()
+      const router = createTestRouter()
+      const route = await navigateTo(router, '/admin/comments')
+      expect(route.path).toBe('/profile')
+    })
+
+    it('non-admin is redirected from /admin/posts to /profile', async () => {
+      await loginAsUser()
+      const router = createTestRouter()
+      const route = await navigateTo(router, '/admin/posts')
+      expect(route.path).toBe('/profile')
+    })
+
+    it('unauthenticated is redirected from /admin to /login', async () => {
+      const router = createTestRouter()
+      const route = await navigateTo(router, '/admin')
+      expect(route.path).toBe('/login')
+    })
+
+    it('unauthenticated is redirected from /admin/comments to /login', async () => {
+      const router = createTestRouter()
+      const route = await navigateTo(router, '/admin/comments')
+      expect(route.path).toBe('/login')
+    })
+
+    it('unauthenticated is redirected from /admin/posts to /login', async () => {
+      const router = createTestRouter()
+      const route = await navigateTo(router, '/admin/posts')
+      expect(route.path).toBe('/login')
     })
   })
 })
