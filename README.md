@@ -115,7 +115,7 @@ API appear same-origin to the browser.
 
 ```
 develop_blog/
-├── backend/devblog/devblog/        # Spring Boot Maven project (package: met.ivan.devblog)
+├── backend/devblog/               # Spring Boot Maven project (package: met.ivan.devblog)
 │   ├── pom.xml
 │   ├── mvnw / mvnw.cmd              # Maven wrapper
 │   └── src/
@@ -150,7 +150,7 @@ develop_blog/
     └── prompt_logs/                # Logged user prompts (UserPromptSubmit hook)
 ```
 
-> Note: the Maven project lives at the nested path `backend/devblog/devblog/`.
+> Note: the Maven project lives at `backend/devblog/`.
 > Run all backend commands from that directory.
 
 ---
@@ -169,7 +169,7 @@ Run the backend and frontend in two separate terminals.
 
 ### Backend
 
-From `backend/devblog/devblog/`:
+From `backend/devblog/`:
 
 ```bash
 # Run the API (http://localhost:8080)
@@ -207,7 +207,7 @@ The dev server proxies `/api/*` to `http://localhost:8080`, so start the backend
 ## Configuration
 
 Backend configuration lives in
-`backend/devblog/devblog/src/main/resources/application.yaml` and is overridable via
+`backend/devblog/src/main/resources/application.yaml` and is overridable via
 environment variables. Keep secrets out of source — supply them through the environment.
 
 | Variable | Default | Description |
@@ -412,7 +412,7 @@ API payloads enrich posts with engagement data: `PostResponse` adds `likeCount`,
 
 ## Testing
 
-- **Backend:** `./mvnw test` (from `backend/devblog/devblog/`). Includes unit tests,
+- **Backend:** `./mvnw test` (from `backend/devblog/`). Includes unit tests,
   Spring slice tests (web, JPA, security), and end-to-end integration tests
   (e.g. user-management and blog-post-management flows). Tests run against an in-memory H2
   database (`application-test.yaml`).
